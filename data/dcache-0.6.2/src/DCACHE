@@ -1,0 +1,74 @@
+dcache - a disk based caching engine.
+
+Uwe Ohse <uwe@ohse.de>, 2001-05-05, clarifications 2005-07-04
+
+dcache limitations and features:
+* the database size is limited to 64 bits (2 gigabytes on systems without
+  support for large files).
+* keys and data are limited to 32 bits.
+* hash, key length, data length and pointers are stored in
+  little endian byte order.
+* keys need not be unique.
+
+A dcache file contains
+* some constants describing the file. The most important of them are:
+  * MAXSIZE: the maximum size of the database.
+  * VERSION: the version number of the database format.
+  * NEWPTR:  where to write new records to.
+  * OLDPTR:  the position where the new old record is to be deleted.
+  * LASTPTR: the byte after the last position written to.
+  * DATAOFF: a pointer to the data area.
+  and some values of minor importance, like statistic information.
+  1024 bytes of disk space of disk space are reserved for this.
+* a fixed size hash table.
+* a fixed size data space for records.
+* the last transaction, if it has been committed, but not executed.
+
+
+A record consists of 
+* the key length (4 bytes)
+* the data length (4 bytes)
+* an expiration value (8 bytes)
+* the key
+* the data.
+The use of the expiration value is implementation defined.
+
+When the hash table reaches a fill grade of 75% or when there is
+not enough space left for a new record then the oldest record in
+the cache will be deleted automatically. The "oldest" record is 
+the one pointed to by OLDPTR.
+
+Relation between OLDPTR, NEWPTR and LASTPTR:
+* new records will be inserted at NEWPTR.
+* old records be deleted at OLDPTR.
+* the space beginning with LASTPTR is unused.
+* OLDPTR starts at the end of the cache file.
+* LASTPTR >= OLDPTR 
+* LASTPTR >= NEWPTR 
+* OLDPTR  >= NEWPTR
+
+A good hash function is important to reduce the number of collisions.
+A crc32 (Zmodem) is used. The hash slot for an record is 
+	crc(key) % number_of_slots
+When a collision occurs a record will be inserted into another slot.
+Therefore the collision chain has to be fixed when a record is deleted.
+Note that this is a non-atomical operation. A system crash during that
+time may leave the cache in a corrupted state (but also note that no
+information is lost at that time, but problems may occur later).
+
+Record deletion:
+* the data length of the record is increased by it's key length.
+* the key length is set to 0.
+
+Transactions:
+* a single transaction is appened to the normal end of the dcache file 
+  as soon as this transaction is commited.
+* this transaction is considered to be completely executed (finished)
+  if the transaction file space starts with a \0 byte.
+* a transaction record for an enter operation looks like this:
+  'E' expirevalue keylen key datalen data
+  The 'E' will be changed to an 'e' as soon as the operation is
+  completed.
+* a transaction record for a delete operation looks like this:
+  'D' position keylen key
+  The 'D' will be changed to an 'd' as soon as the operation is done.

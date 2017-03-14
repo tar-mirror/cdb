@@ -1,0 +1,11 @@
+dcachemake(1) dcachemake.html
+dcachedump(1) dcachedump.html
+dcachelist(1) dcachelist.html
+dcachestats(1) dcachestats.html
+dcachedel(1) dcachedel.html
+dcacheadd(1) dcacheadd.html
+dcacheget(1) dcacheget.html
+dcachereplay(1) dcachereplay.html
+dcachesh(1) dcachesh.html
+libdcache(3) libdcache.html
+dcache_intro(7) dcache_intro.html

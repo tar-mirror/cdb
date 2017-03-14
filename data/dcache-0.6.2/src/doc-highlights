@@ -1,0 +1,10 @@
+dcachemake
+dcachedump
+dcachelist
+dcachestats
+dcacheadd
+dcachedel
+dcacheget
+dcachesh
+dcache_intro
+libdcache

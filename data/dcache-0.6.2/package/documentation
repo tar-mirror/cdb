@@ -1,0 +1,14 @@
+dcachedump.1
+libdcache.3
+dcachesh.1
+dcache_intro.7
+dcache_intro.7.in
+dcachemake.1
+dcacheget.1
+libdcache.3.in
+dcacheinstall.0.in
+dcachereplay.1
+dcachedel.1
+dcacheadd.1
+dcachestats.1
+dcachelist.1

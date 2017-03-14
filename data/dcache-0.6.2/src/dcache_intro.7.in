@@ -1,0 +1,83 @@
+.TH dcache_intro 7 \*(VE \*(PA
+.SH NAME
+An introduction to dcache.
+.section DESCRIPTION
+A dcache is a disk based caching database in a single file containing a
+header and fixed sized hash and data space.
+.paragraph
+The header holds variables and constants describing the database.
+.paragraph
+The hash table holds pointers into the data area and hashes
+of the keys. The hash function used is a crc32.
+.paragraph
+The data area consists of the data, the key, a 64bit number with
+application defined use, and two 32bit numbers holding key and
+data lengths.
+.paragraph
+The header and hash table are mapped into process address space
+using the mmap(2) system call. The data area is not memory mapped,
+thus allowing to handle multi-gigabyte files even on systems with
+a 32bit address space.
+.subsection
+Limitations and features
+.list
+.entry "The database size is limited to 63 bits on operating systems supporting"
+large files.
+.entry "The database size is limited to 31 bits (2 gigabytes) on operating"
+systems not supporting large files.
+.entry "The sum of the length of key, data and record overhead is limited to"
+31 bits (2 gigabytes).
+.entry "The record overhead in the data area is 16 bytes."
+.entry "The number of possible keys is limited by the address space of"
+the process, or somewhat over 200 million, whatever comes first.
+.entry "Storage of numbers is done in big endian byte order (`network byte"
+order'). Databases are portable between hosts with different byte
+orders.
+.entry "The size of the cache and the number of records in it are"
+set at creation time.
+.entry "The cache is cleaned up automatically, removing old records if"
+there's not enough space for data or records.
+.entry "Deletions are supported."
+.entry "Multiple readers and writers are supported, provided that the"
+applications lock to database.
+.entry "Keys need not be unique."
+.endlist
+.section "TOOLS"
+.manlink dcachemake.html dcachemake(1) 
+is used to create a new cache with or without elements, and to
+add a large number of new elements to an existing cache.
+.manlink dcachedump.html dcachedump(1) 
+can dump a complete cache file.
+.paragraph
+.manlink dcacheadd.html dcacheadd(1) 
+may be used to add a single record to the cache.
+.br
+.manlink dcachedel.html dcachedel(1) 
+is the tool used to delete a record from the cache.
+.br
+.manlink dcacheget.html dcacheget(1) 
+retrieves records from the cache.
+.paragraph
+.manlink dcachelist.html dcachelist(1) 
+lists the content of a cache, and
+.manlink dcachestats.html dcachestats(1) 
+prints cache statistics.
+.manlink dcachereplay.html dcachereplay(1) 
+tries to finish incomplete transactions on a cache file.
+.section "SEE ALSO"
+.manlink dcache5.html dcache(5) ,
+.manlink libdcache.html libdcache(3) ,
+.manlink dcacheadd.html dcacheadd(1) ,
+.manlink dcachedel.html dcachedel(1) ,
+.manlink dcachedump.html dcachedump(1) ,
+.manlink dcacheget.html dcacheget(1) ,
+.manlink dcachelist.html dcachelist(1) ,
+.manlink dcachemake.html dcachemake(1) ,
+.manlink dcachestats.html dcachestats(1) .
+.manlink dcachereplay.html dcachereplay(1) .
+.HTML <!--
+.paragraph
+The homepage may be more up-to-date, see
+.br
+http://www.ohse.de/uwe/dcache.html.
+.HTML -->

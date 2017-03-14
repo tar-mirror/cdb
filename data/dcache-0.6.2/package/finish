@@ -1,0 +1,9 @@
+test -d "command/." || mkdir "command"
+cp "compile/dcachelist" "./command/" || exit 1
+cp "compile/dcachestats" "./command/" || exit 1
+cp "compile/dcachedump" "./command/" || exit 1
+cp "compile/dcacheadd" "./command/" || exit 1
+cp "compile/dcachedel" "./command/" || exit 1
+cp "compile/dcachesh" "./command/" || exit 1
+cp "compile/dcacheget" "./command/" || exit 1
+cp "compile/dcachemake" "./command/" || exit 1

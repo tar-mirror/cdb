@@ -1,0 +1,859 @@
+#! /bin/sh
+
+rm -f t.db t.in t1.db t.out t.out1 t.out2 t.cmp t.123 t t.c
+
+cat /etc/group  /etc/passwd \
+	2>/dev/null | \
+	awk -v FS=':' '{x=substr($0,length($1)+2); 
+print "+"length($1)","length(x)":"$1"->"x}' >t.in
+echo >>t.in
+sort t.in >t.cmp
+echo "+4,5:0001->aaaaa" >t.in1 ; 
+echo "+4,5:0002->bbbbb" >>t.in1 ;
+echo >>t.in1
+
+echo "--- basic program invocation checks: dcachemake"
+./dcachemake ; echo $?
+./dcachemake t.db t.tmp t.toomuch ; echo $?
+echo "--- basic program invocation checks: dcachelist"
+./dcachelist t.db ; echo $?
+echo "--- basic program invocation checks: dcachestats"
+./dcachestats t.db ; echo $?
+echo "--- basic program invocation checks: dcachedump"
+./dcachedump t.db ; echo $?
+echo "--- basic program invocation checks: dcachedel"
+./dcachedel t.db ; echo $?
+./dcachedel t.db x z ; echo $?
+echo "--- basic program invocation checks: dcacheget"
+./dcacheget </dev/null ; echo "::"$?
+./dcacheget a b </dev/null ; echo "::"$?
+echo "--- basic program invocation checks: dcachereplay"
+./dcachereplay </dev/null ; echo "::"$?
+./dcachereplay a b </dev/null ; echo "::"$?
+echo "--- dcachemake creates database"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0001->aaaaa
++4,5:0002->bbbbb
+
+EOF
+./dcachestats <t.db
+echo "--- dcachemake only creates valid length tables"
+./dcachemake -e 1 -m 10000 t.db <t.in1 ; echo $?
+./dcachemake -e 1 t.db t.tmp <t.in1; echo $?
+./dcachemake -e 2 -m 10000 t.db t.tmp <t.in1; echo $? # ok
+./dcachemake -m 10 t.db t.tmp <t.in1 ; echo $?
+./dcachemake -m 20 -m 10000 t.db t.tmp <t.in1 ; echo $? # ok
+./dcachemake -e 268435392 t.db t.tmp <t.in1; echo $?
+echo "--- dcachestats basic operation OK"
+./dcachestats <t.db
+echo "--- dcacheget basic operation OK"
+./dcacheget 0001 <t.db ; echo "::"$?
+echo "--- dcachelist basic operation OK"
+./dcachelist <t.db
+echo "--- dcachelist -m basic operation OK"
+./dcachelist -m <t.db |grep "^[#SI]"
+echo "--- dcachedump basic operation OK"
+./dcachedump <t.db
+echo "--- dcachedel basic operation OK"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0001->aaaaa
++4,5:0002->bbbbb
+
+EOF
+./dcachedel t.db 0001 ; echo $?
+./dcachedump <t.db
+./dcachedel t.db 0001 ; echo $?
+echo "--- dcachemake rejects 0 byte keys"
+(echo "+0,1:->b" ; echo) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+echo "--- dcachedel rejects 0 byte keys"
+(echo "+1,1:a->b" ; echo) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+./dcachedump <t.db
+./dcachedel t.db "" ; echo $?
+./dcachedump <t.db
+./dcachedel t.db a ; echo $?
+./dcachedump <t.db
+./dcachedel t.db "" ; echo $?
+./dcachedump <t.db
+echo "--- dcachemake handles 0 byte length data"
+(echo "+1,0:a->" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+echo "--- dcacheget handles 0 byte length data"
+./dcacheget a <t.db ; echo "::"$?
+echo "--- dcachedump handles 0 byte length data"
+./dcachedump <t.db
+echo "--- dcachelist -m handles 0 byte length data"
+./dcachelist -m <t.db
+echo "--- dcachedel handles 0 byte length data"
+./dcachedel t.db a ; echo $?
+./dcachedump <t.db
+echo "--- dcachemake handles duplicate keys"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0001->aaaaa
++4,5:0001->bbbbb
+
+EOF
+./dcachestats <t.db
+echo "--- dcachelist handles duplicate keys"
+./dcachelist <t.db
+echo "--- dcachelist -m handles duplicate keys"
+./dcachelist -m <t.db |grep "^[#SI]"
+echo "--- dcachedump handles duplicate keys"
+./dcachedump <t.db
+echo "--- dcachedel handles duplicate keys"
+./dcachedel t.db 0001 ; echo $?
+./dcachedump <t.db 
+echo "--- dcacheget finds multiple records with the same key"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0001->aaaa1
++4,5:0001->aaaa2
++4,5:0011->aaab1
++4,5:0009->aaac1
++4,5:0009->aaac2
++4,5:0029->aaad1
+
+EOF
+./dcacheget 0001 <t.db ; echo "::"$?
+./dcacheget -n 1 0001 <t.db ; echo "::"$?
+./dcacheget -n 2 0001 <t.db ; echo "::"$?
+echo "--- dcacheget --all finds all records with the same key"
+./dcacheget --all 0009 <t.db ; echo "::"$?
+echo "--- dcacheget doesn't find n+1th records with the same key"
+./dcacheget -n 3 0001 <t.db ; echo "::"$?
+echo "--- dcacheget --separator works"
+./dcacheget -a --separator SEP 0001 <t.db ; echo "::"$?
+echo "--- dcacheget --separator --escape works"
+./dcacheget -a --separator 1 --escape a 0001 <t.db ; echo "::"$?
+./dcacheget -a --separator 1 --escape 1 0001 <t.db ; echo "::"$?
+echo "--- dcachemake -a catches bad cache"
+./dcachemake -a dcachestats </dev/null; echo $?
+echo "--- dcachestats catches bad cache"
+./dcachestats  <dcachestats; echo $?
+echo "--- dcachedump catches bad cache"
+./dcachedump  <dcachestats; echo $?
+echo "--- dcachelist catches bad cache"
+./dcachelist  <dcachestats; echo $?
+echo "--- dcacheget catches bad cache"
+./dcacheget  xxx <dcachestats; echo $?
+echo "--- dcachedel catches bad cache"
+./dcachedel  dcachestats 42 ; echo $?
+echo "--- dcachemake -a handles shortened cache files"
+./dcachemake -e 10 -m 4000 t.db << EOF
++4,5:0013->aaab3
++4,5:0014->aaab3
++4,5:0015->aaab3
++4,5:0016->aaab3
+
+EOF
+dd if=t.db of=t1.db bs=1 count=12  2>/dev/null >/dev/null
+(echo "+4,5:0014->aaab4" ; echo ) | ./dcachemake -a t1.db
+echo "--- dcachestats handles shortened cache files"
+./dcachestats <t1.db
+echo "--- dcachelist handles shortened cache files"
+./dcachelist <t1.db
+echo "--- dcachedump handles shortened cache files"
+./dcachedump <t1.db
+echo "--- dcachedel handles shortened cache files"
+./dcachedel t1.db 42
+echo "--- dcachemake ignores superfluous input lines"
+(echo "+1,1:a->b" ; echo ; echo "+1,1:c->d" ; echo ) \
+  |./dcachemake -e 10 -m 1000 t.db ; echo $? # ok
+./dcachestats <t.db |grep ^slotsinuse
+echo "--- dcachemake handles unexpected end-of-file"
+(echo "+1,1:a->b" ; echo) |./dcachemake -e 10 -m 1000 t.db ; echo $? # ok
+(echo "+1,1:a->b" ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1:a->b" ; echo "+2,2:cc->dd") |./dcachemake -e 10 -m 1000 t.db ;
+echo $?
+echo "--- dcachemake finds bad input"
+(echo "+1,1:a->bb" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,2:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,2:a->b" ; echo ; echo) |./dcachemake -e 10 -m 1000 t.db ; echo $? #ok
+(echo "+1,4:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,4:a->" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+2200000000,4:a->" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,2200000000:a->" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1:a:>b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1:a-<b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1,a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+a,1:0123456789->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+echo "--- dcachemake handles correct tai values"
+(echo "+1,1@1234567890abcdef:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1@1234567890ABCDEF:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1@FfEeDdCcBbAabdef:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+echo "--- dcachedump handles tai values"
+./dcachedump <t.db
+echo "--- dcachelist handles tai values"
+./dcachelist -m <t.db
+echo "--- dcachemake handles bad tai values"
+(echo "+1,1@g234567890abcdef:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1@234567890abcdef:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1@1234567890abcdefg:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+(echo "+1,1@1234567890abcdef0:a->b" ; echo ) |./dcachemake -e 10 -m 1000 t.db ; echo $?
+echo "--- dcachemake handles long keys"
+awk ' 
+END { for (i=511;i<1030; i++) {
+        printf("+%d,%d:%*.*s->%*.*s\n",i,i,i,i,"k",i,i,"0123456789");
+		if (i==515) {i=1021}
+    }
+	printf("\n");
+	i--; # get a long key.
+    printf("%*.*s\n",i,i,"k");
+}
+' </dev/null >t.in3 # note: the last line contains a long key alone.
+./dcachemake -e 64 -m 10000 t.db  <t.in3 ; echo $?
+./dcachestats <t.db 
+echo "--- dcachemake -a handles long keys and their deletion"
+./dcachemake -e 64 -m 2500 t.db  <t.in3 ; echo $?
+./dcachemake -a t.db  <t.in3 ; echo $?
+./dcachestats <t.db 
+echo "--- dcachelist handles long keys"
+./dcachelist <t.db  | sed 's/ \{250\}/_/g' | sed 's/ \{5\}/#/g'
+echo "--- dcachelist -m handles long keys"
+./dcachelist -m <t.db  | sed 's/ \{250\}/_/g' | sed 's/ \{5\}/#/g'
+echo "--- dcachedump handles long keys"
+./dcachedump <t.db  | sed 's/ \{250\}/_/g' | sed 's/ \{5\}/#/g'
+echo "--- dcachedel handles long keys"
+./dcachedel t.db "`tail -n 1 t.in3`" ; echo $?
+./dcachedump <t.db  | sed 's/ \{250\}/_/g' | sed 's/ \{5\}/#/g'
+
+echo "--- dcache_walk handles empty cache"
+# hangs otherwise
+echo | ./dcachemake -e 8 -m 10000 t.db
+./dcachedump <t.db
+
+echo "--- dcacheadd works"
+echo | ./dcachemake -e 8 -m 10000 t.db
+echo val1 >t.in
+./dcacheadd t.db 1 <t.in ; echo $?
+./dcachedump <t.db
+echo "--- dcacheadd works with input from pipe"
+echo | ./dcachemake -e 8 -m 10000 t.db
+echo val2 | ./dcacheadd t.db 2 ; echo $?
+./dcachedump <t.db
+echo "---"
+echo "--- check for specific problems"
+echo "---"
+echo "--- dcachemake creates database with filled hash table"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0000->aaab3
++4,5:0001->aaab3
++4,5:0002->aaab3
++4,5:0003->aaab3
++4,5:0004->aaab3
++4,5:0005->aaab3
++4,5:0006->aaab3
++4,5:0007->aaab3
++4,5:0008->aaab3
++4,5:0009->aaab3
++4,5:0010->aaab3
++4,5:0011->aaab3
+
+EOF
+./dcachestats <t.db
+./dcachelist -m <t.db |grep "^[#SI]"
+echo "--- dcachemake -a adds one record"
+# deleted 0000
+./dcachemake -a t.db << EOF
++4,5:0012->aaab3
+
+EOF
+./dcachestats <t.db
+./dcachelist -m <t.db |grep "^[#SI]"
+echo "--- dcachemake -a adds four records"
+# note: 0016 collides with 9, above
+./dcachemake -a t.db << EOF
++4,5:0013->aaab3
++4,5:0014->aaab3
++4,5:0015->aaab3
++4,5:0016->aaab3
+
+EOF
+./dcachestats <t.db
+./dcachelist -m <t.db |grep "^[#SI]"
+echo "--- dcachemake -d works"
+./dcachemake -d -e 4 -m 10000 t.db << EOF
++4,5:0001->aaaa1
++4,5:0001->aaaa2
++4,5:0011->aaab1
++4,5:0009->aaac1
++4,5:0009->aaac2
++4,5:0029->aaad1
++4,5:0002->aaae1
++4,5:0003->aaae2
++4,5:0004->aaae3
++4,5:0005->aaae4
++4,5:0006->aaae5
++4,5:0007->aaae6
++4,5:0008->aaae7
+
+EOF
+
+echo "--- dcache_enter allows maximum length key/record/overhead combination"
+(echo "+1,2147483630:a->" ; echo )  \
+  | ./dcachemake -e 10 -m 1000 t.db ; echo $? # fails due to cache size
+echo "--- dcache_enter disallows overlong key/record/overhead combination"
+(echo "+1,2147483631:a->" ; echo )  \
+  |./dcachemake -e 10 -m 1000 t.db ; echo $? # fails due to cache size
+echo "--- dcache_enter handles perfectly filled dataarea"
+# 16 bytes overhead + 4 bytes key + 5 bytes data = 25, times 10 = 250
+./dcachemake -e 8 -m 250 t.db << EOF
++4,5:0000->aaaaa
++4,5:0001->aaaaa
++4,5:0002->aaaaa
++4,5:0003->aaaaa
++4,5:0004->aaaaa
++4,5:0005->aaaaa
++4,5:0006->aaaaa
++4,5:0007->aaaaa
++4,5:0008->aaaaa
++4,5:0009->aaaaa
++4,5:0010->aaaaa
++4,5:0011->aaaaa
++4,5:0012->aaaaa
++4,5:0013->aaaaa
++4,5:0014->aaaaa
++4,5:0015->aaaaa
++4,5:0016->aaaaa
++4,5:0017->aaaaa
++4,5:0018->aaaaa
++4,5:0019->aaaaa
+
+EOF
+./dcachelist -m <t.db |grep "^[#SIP]"
+./dcachestats <t.db 
+./dcachedump <t.db
+
+echo "--- dcache_enter handles rollover with free space left"
+awk ' 
+END { j=1; for (i=0;i<100;i++) {
+				printf("+4,%d:%04d->",j,j);
+				for (l=0;l<j;l++) {printf("x")}
+				printf("\n");
+				j%=17;
+				j++;
+           }
+			printf("\n");
+	}
+' </dev/null | ./dcachemake -e 8 -m 250 t.db 
+./dcachelist -m <t.db |grep "^[#SIP]"
+./dcachestats <t.db 
+./dcachedump <t.db
+
+echo "--- dcache_enter handles rollover with free space left (2)"
+# big difference: often enough two records will not fit.
+awk '
+END { j=1; for (i=0;i<1000;i++) {
+                               printf("+4,%d:%04d->",10*j,j);
+                               for (l=0;l<j*10;l++) {printf("x")}
+                               printf("\n");
+                               j%=371;
+                               j++;
+           }
+                       printf("\n");
+       }
+' </dev/null | ./dcachemake -e 2500 -m 5000 t.db
+./dcachelist -m <t.db |grep "^[#SIP]"
+./dcachestats <t.db
+#./dcachedump <t.db
+
+echo "--- dcache_enter handles input from fd"
+awk ' 
+END { for (i=0;i<10;i++) {
+        printf("+4,%d:%04d->",32768,i);
+        for (j=0;j<32;j++) { printf("%1024d",j); }
+		printf("\n");
+    }
+	printf("\n");
+}
+' </dev/null | ./dcachemake -e 12 -m 1000000 t.db  ; echo $?
+./dcachestats <t.db 
+
+
+echo "--- dcacheget handles 0 byte length data"
+(echo "+1,0:a->" ; echo ) | ./dcachemake -e 12 -m 1000 t.db
+./dcacheget a <t.db ; echo "::"$?
+
+# H == here ..... the element which may be moved.
+# F == free ..... the element which has been deleted.
+# B == belongs... where H belongs if there are no collisions.
+echo "--- dcachedel handle HBF"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0005->aaab3
++4,5:0002->aaab3
++4,5:0012->aaab3
++4,5:0032->aaab3
+
+EOF
+./dcachedel t.db 0012
+./dcachestats <t.db
+./dcachelist -m <t.db |grep "^[#SI]"
+
+echo "--- dcachedel handles multiple deletes"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
++4,5:0001->aaab3
+
+EOF
+echo "-- start state"
+./dcachelist -m <t.db | grep ^P
+echo "-- delete first"
+./dcachedel t.db 0001 # delete first
+./dcachelist -m <t.db | grep ^P
+echo "-- delete third"
+./dcachedel -n 3 t.db 0001 # delete third
+./dcachelist -m <t.db | grep ^P
+echo "-- delete all"
+./dcachedel -a t.db 0001 # delete fourth
+./dcachestats <t.db
+
+echo "--- dcachedel handle HBF chain"
+# F=slot 15, B=slot 17, H=slot 0
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0012->aaab3
++4,5:0025->aaab3
++4,5:0008->aaab3
++4,5:0017->aaab3
++4,5:0010->aaab3
++4,5:0020->aaab3
+
+EOF
+./dcachedel t.db 0012
+./dcachelist -m <t.db |grep "^[#SI]"
+
+echo "--- dcachedel handle HFB"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0002->aaab3
++4,5:0012->aaab3
++4,5:0025->aaab3
+
+EOF
+./dcachedel t.db 0002
+./dcachelist -m <t.db |grep "^[#SI]"
+echo "--- dcachedel handle FBH"
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0008->aaab3
++4,5:0007->aaab3
++4,5:0018->aaab3
++4,5:0005->aaab3
++4,5:0002->aaab3
++4,5:0035->aaab3
+
+EOF
+./dcachedel t.db 0008
+./dcachedel t.db 0005
+./dcachelist -m <t.db |grep "^[#SI]"
+
+#echo "--- dcachedel handle FHB"
+#can't be tested since this situation cannot be created if everything works:
+#It needs a completely filled tables.
+echo "--- dcachedel handle BFH"
+
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0001->aaab3
++4,5:0011->aaab3
++4,5:0009->aaab3
++4,5:0029->aaab3
+
+EOF
+./dcachedel t.db 0009
+./dcachelist -m <t.db |grep "^[#SI]"
+
+echo "--- dcachedel handle BHF"
+
+./dcachemake -e 8 -m 10000 t.db << EOF
++4,5:0008->aaab3
++4,5:0017->aaab3
++4,5:0020->aaab3
++4,5:0001->aaab3
++4,5:0029->aaab3
++4,5:0012->aaab3
+
+EOF
+./dcachedel t.db 0012
+./dcachelist -m <t.db |grep "^[#SI]"
+
+
+echo "--- dcache_delete write instead of read bug"
+# this depends on uninitialized data ...
+# fill it.
+awk 'END{ for (i=0;i<4;i++){ printf("+4,5:%04d->%05d\n",i,i); } ; print}' \
+   </dev/null | ./dcachemake -e 4 -m 100 t.db
+./dcachedel t.db 0001
+./dcachedump <t.db
+
+echo "--- dcacheget handles long keys"
+awk ' 
+END { for (i=511;i<1030; i++) {
+        printf("+%d,%d:%*.*s->%*.*s\n",i,i,i,i,"k",i,i,"0123456789");
+		if (i==515) {i=1021}
+    }
+	printf("\n");
+	i--; # get a long key.
+    printf("%*.*s\n",i,i,"k");
+}
+' </dev/null |tee t.in3 | ./dcachemake -e 64 -m 1000000 t.db  ; echo $?
+./dcachestats <t.db 
+./dcacheget "`tail -n 1 t.in3`"  <t.db  | tr -d ' '  ; echo
+
+echo "--- dcachestat catches bad cache"
+./dcachestats <dcachestats ; echo $?
+
+echo "--- dcache_writev works"
+cat >t.c <<EOF
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include "dcache.h"
+#include "dcachei.h"
+#define SP(x) do { \
+d[n].p=x; d[n].len=strlen(x); d[n].fd=42; d[n].next=0; \
+if (n) d[n-1].next = &d[n]; n++;  \
+} while(0) 
+#define SF(y) do { \
+d[n].p=0; d[n].len=y; d[n].fd=0; d[n].next=0; \
+if (n) d[n-1].next = &d[n]; n++;  \
+} while(0) 
+static void myputs(const char *s) {write(1,s,strlen(s));write(1,"\n",1);}
+int main(void)
+{
+	dcache_data d[25];
+	int n;
+
+	myputs("- a few strings from memory");
+	n=0;
+	SP("0");
+	SP("1");
+	SP("2");
+	SP("\n");
+	if (-1==dcache_writev(1,d)) _exit(1);
+
+	myputs("- more strings than the internal iovec array can hold");
+	n=0;
+	SP("0");
+	SP("1");
+	SP("2");
+	SP("3");
+	SP("4");
+	SP("5");
+	SP("6");
+	SP("7");
+	SP("8");
+	SP("9");
+	SP("a");
+	SP("b");
+	SP("c");
+	SP("d");
+	SP("e");
+	SP("f");
+	SP("g");
+	SP("h");
+	SP("i");
+	SP("j");
+	SP("k");
+	SP("l");
+	SP("\n");
+	if (-1==dcache_writev(1,d)) _exit(2);
+
+	myputs("- input from fd");
+	/* input from fd */
+	n=0;
+	SF(1);
+	SF(2);
+	SF(3);
+	SF(4);
+	SF(5);
+	SF(1);
+	if (-1==dcache_writev(1,d)) _exit(4);
+
+	/* end the line */
+	n=0;
+	SP("\n");
+	if (-1==dcache_writev(1,d)) _exit(5);
+
+	myputs("- mixed input from memory and fd");
+	n=0;
+	SP("012345678");
+	SP("9");
+	SP("abcdef");
+	SF(3);
+	SP("---");
+	SF(3);
+	SP("\n");
+	if (-1==dcache_writev(1,d)) _exit(6);
+	_exit(0);
+}
+EOF
+./auto-compile.sh -c t.c || exit 1
+./auto-link.sh t t.o libdcache.a || exit 1
+echo 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef | ./t
+echo $? 
+
+echo "--- transaction #1: basic transaction with 2 new entries"
+exec 2>&1 # dcachesh is somewhat different
+echo | ./dcachemake -e 10 -m 10000 t.db
+./dcachesh <<EOF
+openwrite t.db
+start
+add key1 value1
+add key2 val2
+echo ---- try to find these entries before the commit (XFAIL)
+findall key1
+findall key2
+commit
+echo ---- try to find them after the commit, before the replay (XFAIL)
+findall key1
+findall key2
+replay
+echo ---- try to find them after the replay
+findall key1
+findall key2
+EOF
+echo "---- dumping cache"
+./dcachedump <t.db
+echo "--- transaction #2: basic transaction with a delete"
+echo | ./dcachemake -e 10 -m 256 t.db
+./dcachesh <<EOF
+openwrite t.db
+add key1 value1
+add key2 val2
+echo ---- try to find entries before deletion
+findall key1
+findall key2
+start
+delete key1 ALL
+echo ---- try to find entries before committing deletion
+findall key1
+findall key2
+commit
+echo ---- try to find them after the commit, before the replay
+findall key1
+findall key2
+replay
+echo ---- try to find them after the replay
+findall key1
+findall key2
+EOF
+echo "--- transaction #3: mixed enter/delete"
+./dcachesh <<EOF
+openwrite t.db
+start
+add key1 value1.new
+delete key2 ALL
+commit
+replay
+findall key1
+findall key2
+EOF
+echo "--- transaction #4: cancels work?"
+./dcachesh <<EOF
+openwrite t.db
+start
+add key3 value3
+delete key1 ALL
+cancel
+findall key1
+findall key3
+EOF
+echo "--- transaction #5: no further transaction possible before replay"
+echo | ./dcachemake -e 10 -m 256 t.db
+./dcachesh <<EOF
+openwrite t.db
+add key1 value1
+add key2 value2
+start
+add key3 value3
+add key1 value1a
+delete key2 ALL
+commit
+close
+openwrite t.db
+start
+EOF
+echo "--- transaction #6: replays work after a re-open of the cache"
+./dcachesh <<EOF
+openwrite t.db
+replay
+findall key1
+findall key2
+findall key3
+start
+add key4 val4
+commit
+replay
+findall key4
+EOF
+echo "--- transaction #7: misc. misuses"
+./dcachesh <<EOF
+openwrite t.db
+echo ---- no replay needed
+replay
+echo ---- no cancel possible
+cancel
+echo ---- no commit possible
+commit
+echo ---- empty commit
+start
+commit
+start
+cancel
+echo ---- commit follows cancel
+start
+add key5 value5
+cancel
+commit
+echo ---- start after commit without replay
+start
+add key5 value5
+commit
+start
+replay
+close
+echo ---- readonly cache
+openread t.db
+start
+delete key5 ALL
+add key6 value 6
+commit
+EOF
+echo "--- transaction #8: rollover handling"
+echo | ./dcachemake -e 10 -m 256 t.db
+# 256 bytes in the cache. 
+# headlen=16, keylen(keyNN)=5, valuelen=11 -> 8 records.
+./dcachesh <<EOF
+openwrite t.db
+callback print
+echo ---- filling the cache
+start
+add key01 round0data1
+add key02 round0data2
+add key03 round0data3
+add key04 round0data4
+add key05 round0data5
+add key06 round0data6
+add key07 round0data7
+add key08 round0data8
+commit
+replay
+echo ---- adding a record
+start
+add key11 round1data1
+echo ---- commit and replay
+commit
+replay
+findall key01
+findall key11
+echo ---- adding 9 records
+start
+add key21 round2data1
+add key22 round2data2
+add key23 round2data3
+add key24 round2data4
+add key25 round2data5
+add key26 round2data6
+add key27 round2data7
+add key28 round2data8
+add key29 round2data9
+echo ---- commit
+commit
+echo ---- key11 still should be alive
+findall key11
+echo ---- key02 still should be alive
+findall key02
+echo ---- replay
+replay
+flush
+echo ---- dump the cache
+findall key21
+findall key22
+findall key23
+findall key24
+findall key25
+findall key26
+findall key27
+findall key28
+findall key29
+add key30 round3data0
+add key31 round3data1
+start
+add key40 round4data0
+add key41 round4data1
+commit
+replay
+close
+EOF
+./dcachedump <t.db
+echo "--- transaction #9: dcachereplay works"
+echo | ./dcachemake -e 10 -m 256 t.db
+./dcachesh <<EOF
+openwrite t.db
+add key01 value01
+start
+add key02 value02
+commit
+close
+EOF
+./dcachereplay t.db
+./dcacheget key02 <t.db ; echo
+echo "--- transaction #10: dcachemake --transaction works"
+./dcachemake --transaction -e 6 -m 10000 t.db << EOF
++4,5:0008->aaab3
++4,5:0017->aaab3
++4,5:0020->aaab3
++4,5:0001->aaab3
++4,5:0029->aaab3
++4,5:0012->aaab3
+
+EOF
+./dcachemake --add -T t.db << EOF
++4,5:0108->Aaab3
++4,5:0117->Aaab3
++4,5:0120->Aaab3
++4,5:0101->Aaab3
++4,5:0129->Aaab3
++4,5:0112->Aaab3
+
+EOF
+./dcachedump <t.db
+./dcachestats <t.db
+echo "--- dcacheadd --delete works"
+echo | ./dcachemake -e 10 -m 256 t.db
+echo val1 | ./dcacheadd t.db key1 
+./dcachelist <t.db
+./dcacheget key1 <t.db
+echo val2 | ./dcacheadd --delete t.db key1 
+./dcachelist <t.db
+./dcacheget key1 <t.db
+echo val2a | ./dcacheadd t.db key1 
+./dcachelist <t.db
+./dcacheget --all key1 <t.db
+echo val3 | ./dcacheadd -d t.db key1 
+./dcachelist <t.db
+./dcacheget key1 <t.db
+echo "--- dcacheadd --transaction works"
+echo | ./dcachemake -e 10 -m 256 t.db
+echo val1 | ./dcacheadd t.db key1 
+echo val2 | ./dcacheadd --delete --transaction t.db key1 
+./dcachelist <t.db
+./dcacheget key1 <t.db
+echo "--- dcachedel --transaction is recognized"
+echo | ./dcachemake -e 10 -m 256 t.db
+echo val1 | ./dcacheadd t.db key1 
+echo val2 | ./dcacheadd t.db key1 
+./dcachedel --transaction t.db key1
+./dcachelist <t.db
+echo "- now add another and delete all"
+echo val3 | ./dcacheadd t.db key1 
+./dcachedel --all --transaction t.db key1
+./dcachelist <t.db
+
+rm -f t.db t.in1 t.in3
+rm -f t.in t1.db t.out t.out1 t.out2 t.cmp t.123 t t.c t.badcache
+exit 0

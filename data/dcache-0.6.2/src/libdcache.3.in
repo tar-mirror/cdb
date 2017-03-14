@@ -1,0 +1,868 @@
+.TH libdcache 3 \*(PA \*(VE
+.SH NAME
+libdcache - dcache library reference
+.section DESCRIPTION
+The \fBdcache\fR library offers a low-level interface to a fixed
+sized permanent storage based cache, providing functions to
+enter, delete and search records. The cache strategie is round-robin.
+.paragraph
+On systems supporting large files the cache size is virtually
+unlimited, on other systems it's limited by the maximum file
+size.  The total length of a key and the record is limited to
+2^31 bytes (2 GB).
+.paragraph
+Multiple processes may use the same cache, provided that they are
+carefully using some kind of locking (the library provides locking
+functions).
+.paragraph
+.subsection OVERVIEW
+.intlink dcache_create_fd
+or 
+.intlink dcache_create_name
+create a cache.
+.paragraph
+Use 
+.intlink dcache_init
+to initialize the cache file, to prepare
+it for all other operations, and \fBdcache_free\fR when you are
+finished using the cache, to free all resources associated to it
+by this process.
+.paragraph
+.intlink dcache_enter 
+adds a new record to the cache, deleting old records if needed.
+.paragraph
+.intlink dcache_lookupstart
+starts a new search, and 
+.intlink dcache_lookupnext
+continues a search for a key.
+.paragraph
+.intlink dcache_delete
+deletes the last record found by 
+.intlink dcache_lookupnext.
+.paragraph
+.intlink dcache_walkstart 
+and
+.intlink dcache_walk 
+go through the whole cache content, allowing to read all keys and
+records from the cache.
+.paragraph
+.intlink dcache_lck_excl
+, 
+.intlink dcache_lck_share
+, 
+.intlink dcache_lck_tryexcl
+,
+.intlink dcache_lck_tryshare
+and
+.intlink dcache_lck_unlock
+allow to lock and unlock the cache. Using them is
+quite important, so be sure to read the section named
+.intlink LOCKING
+below.
+.paragraph
+.intlink dcache_reload_vars
+must be used to re-read the in-memory copies
+of certain cache variables after a lock has been aquired. The 
+application also has to call 
+.intlink dcache_store_vars
+to save these
+variables before a lock is released.
+.paragraph
+.intlink dcache_flush 
+makes all pending modifications to the cache
+visible to other processes. 
+.intlink dcache_sync
+forces the operating 
+system to write all pending modifications to the disk.
+.paragraph
+.intlink dcache_read
+reads something from the cache.
+.intlink dcache_seek
+moves a file pointer.
+.intlink dcache_fd 
+returns the file descriptor of the cache.
+.intlink dcache_datapos ,
+.intlink dcache_datalen ,
+.intlink dcache_keypos ,
+.intlink dcache_keylen ,
+reports the position of key and data and the expiration times found by 
+.intlink dcache_lookupnext
+or 
+.intlink dcache_walk .
+.TAG LOCKING
+.subsection LOCKING
+Some kind of locking has to be used if more than one process accesses 
+the same cache at the same time. The 
+.intlink dcache_lck_excl
+, 
+.intlink dcache_lck_share
+, 
+.intlink dcache_lck_tryexcl
+,
+.intlink dcache_lck_tryshare
+and
+.intlink dcache_lck_unlock
+functions may be used for this. They are implemented using fcntl.
+The library internally never calls them, therefore you might replace
+them with other locking primitives or semaphores.
+.paragraph
+A process trying to modify a cache has to hold an exclusive lock, while
+a process trying to find something from the cache has to hold a shared 
+lock. Well-behaved processes release the lock as soon as possible.
+.paragraph
+
+\fBexclusive access\fR means that other processes will not be allowed
+to do any operation on the database in the time this process
+holds the lock.
+
+.subsection "Automatic Synchronization"
+The library by default tries to minimize the damage done by a crash
+and calls dcache_sync if some record has been deleted during 
+\fBdcache_enter\fR and after a record has been added. This costs
+considerable performance - fsync() isn't cheap at all. If this is
+not needed you can use the \fBdcache_set_autosync(cache,0)\fR to
+stop this.
+
+.section "Data Types"
+.TAG dcache_type
+.subsection "The dcache data type"
+This structure describes the cache. Please treat it as opaque
+data type.
+.TAG dcache_uint32
+.subsection "The dcache_uint32 data type"
+An unsigned integer of 32 bits width.
+.TAG dcache_reclen
+.subsection "The dcache_reclen data type"
+An signed integer of 32 bits width. It holds then length of objects 
+in the cache.
+.TAG dcache_pos
+.subsection "The dcache_pos data type"
+An signed integer of 64 bits width. It holds then position of objects 
+in the cache.
+.TAG dcache_data
+.subsection "The dcache_data data type"
+This structure describes a part of or the whole data to be inserted into the
+cache. It contains the following elements:
+.paragraph
+    const char *p;
+.br
+    int fd; /* ignored if p != NULL */
+.br
+    dcache_reclen len;
+.br
+    struct dcache_data_struct *next;
+.br
+.paragraph
+\fIp\fR, if it is not NULL, is a pointer to a string. The length of the
+string is given by \fIlen\fR. If \fIp\fR is NULL then \fIfd\fR has to
+be a valid file descriptor, from which \fIlen\fR bytes will be written.
+\fInext\fR points to the next of a list of dcache_data structures.
+.TAG dcache_delete_callback
+.subsection "The dcache_delete_callback data type"
+This function type can be used to inform the application if a
+record is going to be deleted during a dcache_enter process. To
+inform the library about the callback function use the
+.intlink dcache_set_delete_callback
+function.
+.paragraph
+The callback function has to return 0 if everything is OK or
+-1 in case of error. Additional return codes may be introduced
+later. 
+.br
+If the function returns an error then dcache_enter will return -1, but
+neither delete the old record nor add the new one.
+.paragraph
+The callback function receives a pointer to a \fIdcache\fR structure.
+It may use the 
+.intlink dcache_keypos ,
+.intlink dcache_keylen ,
+.intlink dcache_datapos ,
+.intlink dcache_datalen 
+and
+.intlink dcache_fd
+functions to get information about the record to be deleted.
+Key and data may be read from the file descriptor returned by
+\fBdcache_fd\fR in this order.
+.section TRANSACTIONS
+\fBdcache\fR supports transactions since version 0.6.0. 
+.br
+A transaction is started by calling 
+.intlink dcache_trans_start ,
+it may be cancelled by 
+.intlink dcache_trans_cancel ,
+and it will be commited by a call to 
+.intlink dcache_trans_commit .
+The later saves the changes, if any, into the replay log. To actually
+make the changes to the cache the program has to call
+.intlink dcache_trans_replay .
+No further transactions may be started before 
+.intlink dcache_trans_replay 
+has finished successfully. 
+.br
+\fRdcache\fR transactions require cooperation between the applications.
+If the replay could, for whatever reason, not be completed, then 
+it has to be continued before any other modification to the 
+cache is done. If you break this rule the cache will still be okay,
+from a purely technical point of view, but may contain unexpected
+records. Example: an application could, during the transaction, check
+whether a key exists in the cache, and enter it only if it doesn't.
+If you then insert that key into your cache before you execute
+the replay, then your cache will contain a duplicate key after
+the replay.
+.paragraph
+.subsection "Transaction Details"
+.list
+.entry
+If a single enter operation of the transaction has been executed, but the
+process is unable to mark that operation as done, then this operation
+will be tried again at the time 
+.intlink dcache_trans_replay
+is called again. Impact: this record will be duplicated.
+.br
+Workaround: Don't turn off the power at that point.
+Fixing this is not worth the pain of an additional fsync or two.
+.br
+This is not a problem for the delete operation, as it ignores deleted
+records.
+.entry
+Any modification done inside a transaction will be visible after a
+successful call to 
+.intlink dcache_trans_replay .
+.entry 
+.intlink dcache_trans_replay
+may be repeated as often as you wish, in order to complete it.
+.entry
+Modification of the data of existing cache entries are \fBnot\fR
+supported.
+.entry
+Calls to a callback function, if any, will be done during the replay.
+.entry
+It is good practice to check whether a log replay is needed soon
+after a cache is opened. Use the 
+.intlink dcache_trans_need_replay
+function for this.
+.entry
+do not forget to call
+.intlink dcache_flush
+or 
+.intlink dcache_sync
+after 
+.intlink dcache_trans_commit
+or 
+.intlink dcache_trans_replay
+.entry
+Uncommited changes are stored in memory.
+.entry
+Commited, but not replayed, changes take up disk space.
+.endlist
+.subsection "Transaction Locking"
+Things are simple if you aquire a exclusive lock before you call
+.intlink dcache_trans_start 
+and release if after 
+.intlink dcache_trans_replay . 
+.paragraph
+Things get more interesting if you do not want to lock the 
+cache exclusively for the whole transaction. You then need
+two locks: a read lock for the cache, to be held whenever
+you access the cache, and an exclusive lock for the log, which
+has to be held for the whole period of the transaction (from start to 
+commit), the read lock may 
+released whenever you do not access the cache.
+.section FUNCTIONS
+.TAG dcache_create_fd
+.subsection dcache_create_fd
+.func int dcache_create_fd "(int fd, dcache_pos maxsize,"
+.args "dcache_uint32 elements, int do_hole);"
+.endfunc
+\fBdcache_create_fd\fR creates a disk cache on \fIfd\fR. Any data
+in the will be will lost. \fImaxsize\fR
+is the maximum number of data bytes in the cache. \fIelements\fR is
+the size of the hash table.
+.paragraph
+\fBNote:\fR 25% of the space in the hash table will 
+not be used, but left free for performance reasons. The cache is
+likely to offer better performance if only 50% of the hash table
+is used.
+.paragraph
+If \fIdo_hole\fR is set then the data area of the file is created
+with lseek, thus not allocating the disk space at this time. Otherwise
+the hole \fImaxsize\fR bytes are written. The usage of holes may
+lead to run-time problems if the free disk space is low. Holes are
+a kind of overcommitment and unsafe.
+.paragraph
+\fBdcache_create_fd\fR returns fd or -1 in case of error.
+.paragraph
+\fBdcache_create_fd\fR refuses to create hash tables with less then 4
+records, with too many records (the hash and pointer tables need to
+fit into 4 billion bytes, but your operating system is likely to 
+enpose more rigid limitations), or caches with a data size of less
+than one record with a one byte key. It returns EINVAL in this case.
+.paragraph
+The function does not lock the cache in any way.
+
+.TAG dcache_create_name
+.subsection dcache_create_name
+.func int dcache_create_name "(const char *fname, int mode,"
+.args "dcache_pos maxsize, dcache_uint32 elements,"
+.args "int do_hole);"
+.endfunc
+\fBdcache_create_name\fR works like 
+.intlink \fBdcache_create_fd\fR .
+.paragraph
+The cache will be named \fIfname\fR. An already
+existing file \fIfname\fR will be overwritten. \fIfname\fR will
+be deleted in case of an error. \fImode\fR specifies the
+access rights of a newly created file (see open(2)).
+
+.TAG dcache_datalen
+.subsection dcache_datalen
+.func dcache_reclen dcache_datalen "(dcache *)";
+.endfunc
+This function, implemented as a macro, returns the length of the data
+of the record found by the latest successful call to 
+.intlink dcache_lookupnext 
+or
+.intlink dcache_walk .
+
+.TAG dcache_datapos
+.subsection dcache_datapos
+.func dcache_pos dcache_datapos "(dcache *)";
+.endfunc
+This function, implemented as a macro, returns the position of the data
+of the record found by the latest successful call to 
+.intlink dcache_lookupnext 
+or 
+.intlink dcache_walk .
+It may be used as argument to, for example, lseek. Note: this position
+is invalid after any change to the cache has been done.
+
+.TAG dcache_datatime
+.subsection dcache_datatime
+.func dcache_time dcache_datatime "(dcache *)";
+.endfunc
+This function, implemented as a macro, returns the expiration value of 
+the record found by the latest successful call to 
+.intlink dcache_lookupnext 
+or 
+.intlink dcache_walk .
+
+.TAG dcache_delete
+.subsection dcache_delete
+.func int dcache_delete "(dcache *cache);"
+.endfunc
+\fBdcache_delete\fR deletes the record found by the last call
+to 
+.intlink dcache_lookupnext . 
+It \fBMUST\fR only be called if 
+no change to the database has been done since the last 
+call to 
+.intlink dcache_lookupstart .
+.paragraph
+The function \fBMUST\fR be called with exclusive locking turned on.
+The lock \fBMUST\fR have been aquired before the call to 
+.intlink dcache_lookupstart .
+.paragraph
+It's not safe to kill a process during the execution of this
+function.
+.paragraph
+\fBdcache_delete\fR returns -1 in case of error and 0 otherwise. 
+\fIerrno\fR is set to \fIEINVAL\fR if some values in the cache
+file were invalid.
+.paragraph
+.TAG dcache_enter
+.subsection dcache_enter
+.func int dcache_enter "(dcache *cache, const void *key,"
+.args "dcache_reclen keylen, dcache_data *data, "
+.args "dcache_time timevalue);"
+.endfunc
+\fBdcache_enter\fR enters a record into the cache, freeing old records
+if space or table slots are needed. \fIkey\fR and \fIkeylen\fR describe
+the key, and \fIdata\fR is a list of 
+.intlink dcache_data 
+structures holding information about the record data.
+.paragraph
+Key, data and record overhead (16 bytes) together must not exceed 2 GB 
+(31 bits) of size. Records with empty keys (0 bytes length) cannot be
+entered into the database. The \fIkey\fR obviously has to fit into
+the memory.
+.paragraph
+If an old record is to be deleted a callback function call be called
+to inform the application. See
+.intlink dcache_delete_callback
+for more information.
+.paragraph
+The application must hold a exclusive lock on the cache when 
+\fBdcache_enter\fR is called.
+
+.TAG dcache_fd
+.subsection dcache_fd
+.func int dcache_fd "(dcache *c)";
+.endfunc
+This function, implemented as a macro, returns the file descriptor
+associated with \fIc\fR.
+
+.TAG dcache_flush
+.subsection dcache_flush
+.func int dcache_flush "(dcache *cache)"
+.endfunc
+A call to \fBdcache_flush\fR makes all pending modifications to the
+cache visible to other processes. The function returns 0 if successful
+and -1 on error.
+It's safe to unlock the cache afterwards.
+.paragraph
+Note that \fBdcache_flush\fR calls msync and is expensive.
+
+.TAG dcache_free
+.subsection dcache_free
+.func int dcache_free "(dcache *cache)"
+.endfunc
+\fBdcache_free\fR frees all resources the library allocated
+for \fIcache\fR. It should be called after all pending
+changes, if any, have been sent to the storage medium
+by means of 
+.intlink dcache_flush or
+.intlink dcache_sync .
+
+.TAG dcache_init
+.subsection dcache_init
+.func int dcache_init "(dcache *cache, int fd, int forwrite);"
+.endfunc
+\fBdcache_init\fR initializes the \fIcache\fR structure with content
+from \fIfd\fR. \fIfd\fR has to be a valid file descriptor, opened
+for access matching \fIforwrite\fR.
+\fBdcache_init\fR will call 
+.intlink dcache_reload_vars .
+.paragraph
+If \fIforwrite\fR is not 0 then the cache header and hash space be
+treated as writable.
+.paragraph
+\fBdcache_init\fR returns 0 in case of success or -1 in case of error.
+In the case of a corrupted cache header EINVAL is set.
+.paragraph
+\fBdcache_init\fR does not lock the cache. The application has to do
+this before the call to \fBdcache_init\fR.
+
+.TAG dcache_keylen
+.subsection dcache_keylen
+.func dcache_reclen dcache_keylen "(dcache *)";
+.endfunc
+This function, implemented as a macro, returns the length of the key
+of the record found by the latest successful call to 
+.intlink dcache_lookupnext 
+or
+.intlink dcache_walk .
+
+.TAG dcache_keypos
+.subsection dcache_keypos
+.func dcache_pos dcache_keypos "(dcache *)";
+.endfunc
+This function, implemented as a macro, returns the position of the key
+of the record found by the latest successful call to 
+.intlink dcache_lookupnext 
+or 
+.intlink dcache_walk .
+It may be used as argument to, for example, lseek. Note: this position
+is invalid after any change to the cache has been done.
+
+.TAG dcache_lck_excl
+.subsection dcache_lck_excl
+.func int dcache_lck_excl "(int fd);"
+.endfunc
+The functions locks the cache behind \fIfd\fR (a valid file 
+descriptor) for exclusive access. It returns 0 on success and -1
+in case of failure. If the lock cannot be aquired instantly then
+the function will wait.
+.paragraph
+This function takes a file descriptor as argument because it (or
+one of the other \fBdcache_lck_*\fR functions) should be called
+before dcache_init is invoked.
+
+.TAG dcache_lck_share
+.subsection dcache_lck_share
+.func int dcache_lck_share "(int fd);"
+.endfunc
+The functions locks the cache behind \fIfd\fR (a valid file 
+descriptor) for shared access. It returns 0 on success and -1
+in case of failure. If the lock cannot be aquired instantly then
+the function will wait.
+.paragraph
+\fBshared access\fR means that other processes will be allowed
+to do read operations on the database in the time this process
+holds the lock.
+
+.TAG dcache_lck_tryexcl
+.subsection dcache_lck_tryexcl
+.func int dcache_lck_tryexcl "(int fd);"
+.endfunc
+The functions locks the cache behind \fIfd\fR (a valid file 
+descriptor) for exclusive access. It returns 0 on success and -1
+in case of failure. If the lock cannot be aquired instantly then
+the function will set \fIerrno\fR to EAGAIN and return -1.
+
+.TAG dcache_lck_tryshare
+.subsection dcache_lck_tryshare
+.func int dcache_lck_tryshare "(int fd);"
+.endfunc
+The functions locks the cache behind \fIfd\fR (a valid file 
+descriptor) for shared access. It returns 0 on success and -1
+in case of failure. If the lock cannot be aquired instantly then
+the function will set \fIerrno\fR to EAGAIN and return -1.
+.paragraph
+
+.TAG dcache_lck_unlock
+.subsection dcache_lck_unlock
+.func int dcache_lck_unlock "(int fd);"
+.endfunc
+The function released the lock on the cache behind \fIfd\fR.
+It returns 0 on success and -1 in case of failure.
+
+.TAG dcache_lookupstart
+.subsection dcache_lookupstart
+.func void dcache_lookupstart "(dcache *cache);"
+.endfunc
+This function prepares the library for a new lookup and has to
+be called before \fBdcache_lookupnext\fR.
+.paragraph
+\fIcache\fR has to be initialized before and has to be locked.
+
+.TAG dcache_lookupnext
+.subsection dcache_lookupnext
+.func int dcache_lookupnext "(dcache *cache,const char *key,"
+.args "dcache_reclen keylen);"
+.endfunc
+\fBdcache_lookupnext\fR looks for the next record under key \fIkey\fR in 
+the cache. \fInext\fR is the \fInth\fR record where \fIn\fR is the number of 
+calls to \fBdcache_lookupnext\fR after the latest call to
+\fBdcache_lookupstart\fR.
+.paragraph
+The function return 1 of the record is found, 0 if the record is not
+found and -1 in case of error.
+.paragraph
+All calls of \fBdcache_lookupnext\fR must use the same \fIkey\fR and 
+\fIkeylen\fR as all other calls do \fBdcache_lookupnext\fR since the
+latest call to \fBdcache_lookupstart\fR.
+.paragraph
+If the function returns 1 then the record my be read from the file
+descriptor associated with the cache (see
+.intlink dcache_fd ")."
+.intlink dcache_datalen
+returns the length of the data, and 
+.intlink dcache_datatime
+returns it's expiration time.
+.intlink dcache_datapos 
+returns the position of the record in the
+cache, if you need that for seeking back.
+.paragraph
+\fBdcache_lookupnext\fR must be called while a lock is hold. It
+must not be called if a change to the database has been done
+after the latest call to \fIdcache_lookupstart\fR.
+.paragraph
+If you need to read the data found by \fIdcache_lookupnext\fR then you have
+to do this before the lock is released.
+
+.TAG dcache_lookup
+.subsection dcache_lookup
+.func int dcache_lookup "(dcache *cache,const char *key,"
+.args "dcache_reclen keylen);"
+.endfunc
+This is implemented as a call to \fBdcache_lookupstart\fR
+followed by a call to \fBdcache_lookupnext\fR. It finds the
+first record matching \fIkey\fR. 
+See above for a description of the locking requirements.
+
+.TAG dcache_read
+.subsection dcache_read
+.func dcache_reclen dcache_read "(int fd, "
+.args "void *buf,dcache_reclen len);"
+.endfunc
+\fBdcache_read\fR reads \fIlen\fR bytes from the file descriptor 
+\fIfd\fR. It returns -1 in case of error and \fIlen\fR otherwise.
+If less than \fIlen\fR bytes are available -1 is returned with
+errno set to EIO (I/O Error).
+.paragraph
+While the function is called a lock on the cache behind \fIfd\fR
+has to be held.
+
+.TAG dcache_reload_vars
+.subsection dcache_reload_vars
+.func int dcache_reload_vars "(dcache *cache);"
+.endfunc
+\fBdcache_reload_vars\fR loads a number of variables describing the
+state of the \fIcache\fR from the shared memory area. It has to be called
+after a lock has been aquired and before any other action on the
+cache is done.
+.paragraph
+The function returns -1 in case of error (EINVAL means that the 
+cache is corrupted) or 0 if succesful.
+
+.TAG dcache_seek
+.subsection dcache_seek
+.func dcache_pos dcache_seek "(dcache *cache, dcache_pos xpos)"
+.endfunc
+\fBdcache_seek\fR moved the file pointer of the file descriptor
+\fIfd\fR to \fIpos\fR. It returns -1 on error and 0 if successful.
+Note that this function does not report the old position. Use
+.intlink dcache_datapos 
+or 
+.intlink dcache_keypos
+for thi.s
+.paragraph
+\fBWarning:\fR Any use of \fBdcache_seek\fR to position the file descriptor
+at a position outside the range between the position returned by the last 
+call to \fBdcache_datapos\fR or \fBdcache_keypos\fR and the end of the 
+record is illegal.
+.paragraph
+This function is useful if you need to read key and/or data multiple
+times. Don't use it otherwise.
+.paragraph
+This function must be called while the cache is locked, and must not
+be called if any modification to the cache has been done after the
+last call to \fBdcache_lookupnext\fR or \fBdcache_walk\fR.
+
+.TAG dcache_set_autosync
+.subsection dcache_set_autosync
+.func void dcache_set_autosync "(dcache *cache, int onoff)";
+.endfunc
+Causes the library to automatically synchronize changes to the disk.
+If \fIonoff\fR is zero then no automatic synchronization will be done,
+any other value means the opposize.
+.paragraph
+\fIAutomatic synchronization\fR means that, if an old record is deleted
+during during \fBdcache_enter\fR, \fBdcache_flush\fR will be called to
+flush any changes to the disk. This reduces the probability that a
+crash / shutdown during the process of entering the new data to the
+cache damages the database.
+.paragraph
+Note that still a crash at the totally wrong time can still eat the cache,
+this is just far more unlikely to happen.
+.paragraph
+This function may be called even if no lock is held.
+
+.TAG dcache_set_delete_callback
+.subsection dcache_set_delete_callback
+.func void dcache_set_delete_callback "(dcache *cache,"
+.args "dcache_delete_callback cb)"
+.endfunc
+When \fRdcache_enter\fR needs to delete a record it can call
+a callback function. The type of the callback function is
+.intlink dcache_delete_callback .
+More information may be found at the description of the type.
+.paragraph
+To delete an existing callback you can set the callback to a NULL 
+pointer through another call to dcache_set_delete_callback.
+.br
+.br
+When using transactions the callback function will be called during
+the log replay.
+
+.TAG dcache_store_vars
+.subsection dcache_store_vars
+.func void dcache_store_vars "(dcache *cache);"
+.endfunc
+This function stores the working copies of the variables in the
+cache header area to the shared memory area. It has to be called
+while an exclusive lock on the cache is held. A call to 
+\fBdcache_flush\fR makes sure
+that the changes are flushed to the disk and visible to other
+processes.
+
+.TAG dcache_sync
+.subsection dcache_sync
+.func int dcache_sync "(dcache *cache);"
+.endfunc
+A call to \fBdcache_sync\fR causes all pending modifications to the
+cache \fIcache\fR to be written to the storage medium. The function
+will not return before this is finished. It will return 0 if 
+successful and -1 on error.
+.paragraph
+It's safe to unlock the cache afterwards. Obviously this function
+has to be called while a lock is held.
+.paragraph
+Note that \fBdcache_sync\fR calls fsync and msync and is generally 
+very expensive.
+
+.TAG dcache_trans_cancel
+.subsection dcache_trans_cancel
+.func int dcache_trans_cancel "(dcache *cache);"
+.endfunc
+Cancels the pending changes: The will not be written into the 
+transaction log. It return -1 in case of error, and 0 otherwise.
+The only possible error is that there is no open transaction.
+
+.TAG dcache_trans_commit
+.subsection dcache_trans_commit
+.func int dcache_trans_commit "(dcache *cache);"
+.endfunc
+Commits the pending changes into the transaction log. It return -1
+in case of error, and 0 otherwise.
+
+.TAG dcache_trans_commit
+.subsection dcache_trans_commit
+.func int dcache_need_replay "(dcache *cache);"
+.endfunc
+Returns 1 if there is a committed, but not already replayed
+transaction, 0 if the is no such thing, and -1 in case of error.
+
+.TAG dcache_trans_start
+.subsection dcache_trans_start
+.func int dcache_trans_start "(dcache *cache);"
+.endfunc
+Starts a transaction. New records entered afterwards will not 
+be visible until the transaction has been committed and replayed.
+Deletions will not be visible up to that point, too.
+It return -1 in case of error, and 0 otherwise.
+
+.TAG dcache_trans_replay
+.subsection dcache_trans_replay
+.func int dcache_trans_replay "(dcache *cache);"
+.endfunc
+Takes committed changes, if any, and executes them. It returns
+-1 in case of error, and 0 if all changes have been done.
+
+The function changes the cache. It is not safe to continue
+.intlink dcache_lookupstart ,
+.intlink dcache_lookup ,
+or
+.intlink dcache_lookupnext
+after 
+.intlink dcache_trans_replay
+has been called.
+
+.TAG dcache_walkstart
+.subsection dcache_walkstart
+.func void dcache_walkstart "(dcache *cache);"
+.endfunc
+This function prepares the library for a walk through all elements
+of a cache.
+.paragraph
+\fIcache\fR has to be initialized and locked.
+
+.TAG dcache_walk
+.subsection dcache_walk
+.func int dcache_walk "(dcache *cache, int *fd,"
+.args "dcache_reclen *keylen, dcache_reclen *datalen,"
+.args "dcache_time *expire);"
+.endfunc
+\fBdcache_walk\fR fills \fIfd\fR, \fIkeylen\fR, \fIdatalen\fR
+and \fIexpire\fR with information describing the next element
+in \fIcache\fR.
+.paragraph
+The function returns -1 if an error has occured. A return code
+of zero means there are no further records in the cache. One (1)
+means that the function successfully filled the variables with
+information about the record.
+.paragraph
+You may read the key from \fIfd\fR. It is \fIkeylen\fR bytes
+long. Then, after you read the key, you can read the data 
+from \fIfd\fR. It is \fIdatalen\fR bytes long. \fIexpire\fR
+is filled the the expiration value.
+.paragraph
+Any or all of the pointer variables may be NULL pointers. You may
+only read the key if at least \fIfd\fR and \fIkeylen\fR are no 
+NULL pointers, and you may only read the record data of \fIfd\fR,
+\fIkeylen\fR and \fIdatalen\fR are no NULL pointers.
+.paragraph
+\fBdcache_walk\fR may only be called if \fBdcache_walkstart\fR has
+been called before and if neither a change to the cache has happened
+since then nor the lock to the database has been released.
+.paragraph
+Note: You \fBMUST NOT\fR call \fBdcache_delete\fR after a call to
+\fBdcache_walk\fR. \fBdcache_delete\fR must only be used after
+a successful call to \fBdcache_lookupnext\fR.
+
+.section "EXAMPLES"
+.TAG transaction_example
+.subsection "Transaction Example"
+.paragraph
+dcache cache;
+.nf
+.br
+int fd=open("somefile.dcache",O_RDWR);
+.br
+if (-1==fd) die();
+.br
+if (-1==dcache_init(&cache,fd,1)) die();
+.br
+if (-1==dcache_lck_excl(fd)) die();
+.br
+switch(dcache_need_replay(&cache)) {
+.br
+case 0: break;
+.br
+case -1: die();
+.br
+default:
+.br
+  if (-1==dcache_trans_replay(&cache)) die();
+.br
+  if (-1==dcache_flush(&cache)) die();
+.br
+}
+.br
+if (-1==dcache_trans_start(&cache)) die();
+.br
+/* this functions enters and deletes cache entries */
+.br
+if (enters_and_delete_ok(&cache)) {
+.br
+    if (-1==dcache_trans_commit(&cache)) die(); /* lose */
+.br
+    if (-1==dcache_trans_replay(&cache)) die();
+.br
+    if (-1==dcache_flush(&cache)) die();
+.br
+} else {
+.br
+    if (-1==dcache_trans_cancel(&cache)) die(); 
+.br
+}
+.br
+.fi
+.paragraph
+You might want to use 
+.intlink dcache_sync 
+instead of 
+.intlink dcache_flush
+depending on how valuable your data is.
+
+.section "COMPATIBILITY"
+.subsection "64 bit"
+\fBdcache\fR needs what's often called "large file support".
+System vendors often express their incompetence by not using a clean
+solution ("just use 64bit everywhere"), but by providing two sets of
+system calls, one for small and one for large files. One has to
+define some compile time constants to get support for
+large files. See
+.URL "this page" http://www.ohse.de/uwe/articles/lfs.html
+.HTML <!--
+http://www.ohse.de/uwe/articles/lfs.html
+.HTML -->
+for my opinion about this.
+.paragraph
+The \fBdcache\fR package deals with that.
+.br
+The library doesn't try even try to do any magic (whatever it tries
+could be completely wrong - depending on what your package does). 
+If you want to
+use the dcache library you have to deal this this yourself. You
+might find lfs.sh in the dcache package "src" directory helpful.
+It basically generates four files, on contains a define (for 
+informational purposes only), one a set of cflags, one a set
+of ldflags (typically empty) and one contains the names of libraries
+to link into the program (if you are feeling bad about this i can
+understand you - what did the POSIX people think while they made
+the C library guess CFLAGS for a compiler when it doesn't even know
+which one is installed?).
+.br
+The simple solution is to just put -D_LARGEFILE_SOURCE
+-DFILE_OFFSET_BITS=64 into your compiler invocation and forget about
+the rest. But in any case be careful to compile \fIall\fR your
+modules with or all without this flag.
+.paragraph
+Note that you can forget this entire section if your files do not exceed
+2GB.
+.subsection mmap
+\fBdcache\fR needs a reasonable implementation of memory mapped files.
+This should be no problem today, but might lead to corrupted caches on
+older systems.
+

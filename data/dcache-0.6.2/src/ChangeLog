@@ -1,0 +1,86 @@
+2005-07-15	Uwe Ohse <uwe@ranan.ohse.de>
+
+check:    make sure t.c (docheck) has prototypes for _exit and strlen.
+          remove all stdio calls from there to appease dietcc.
+internal: only declare extern int errno if NEED_EXTERN_INT_ERRNO is defined.
+          Fixes warnings.
+internal: remove guess-compiler.sh related bloat warnings of diet linker.
+version:  0.6.2
+
+2005-07-05	Uwe Ohse <uwe@ranan.ohse.de>
+
+version:  0.6.1
+
+2005-07-04	Uwe Ohse <uwe@ranan.ohse.de>
+
+doc:      fix some typos and other minor stuff.
+doc:      make html pages use server features.
+doc:      make better internal links on html pages.
+doc:      add dcachesh command doc.
+
+2005-06-29	Uwe Ohse <uwe@ranan.ohse.de>
+
+ui:       add documentation to dcachesh.
+ui:       dcachestats shows whether a cache needs replay.
+internal: switch dcachereplay,dcacheget,dcachestats,dcachedel to new uogetopt.
+          Also switch doc. to that.
+internal: add common.h (common doc. stuff).
+internal: sync library functions against repository.
+internal: remove redundant declaration from dcachei.h.
+portab:   missing ftruncate() wasn't caught in dcache_create.c
+version:  0.6.1-beta2
+
+2004-08-17	Uwe Ohse <uwe@ranan.ohse.de>
+
+internal: switch dcachedump to new uogetopt
+internal: generate dcachedump documentation automatically.
+internal: switch dcachelist to new uogetopt
+internal: generate dcachelist documentation automatically.
+ui:       dcachelist new escapes control charakters
+
+2004-08-16	Uwe Ohse <uwe@ranan.ohse.de>
+
+internal: library function updates from the repository.
+internal: dcachemake switched to new uogetopt.
+internal: generate dcachemake documentation automatically.
+
+2003-04-05	Uwe Ohse <uwe@ranan.ohse.de>
+
+ui:       dcachedel --transaction implemented.
+ui:       dcacheadd --transaction implemented.
+ui:       dcacheadd --delete implemented.
+doc:      document them.
+bugfix:   check called a few programs of the package without ./ prefix.
+
+2003-02-03	Uwe Ohse <uwe@ranan.ohse.de>
+
+internal: sync against uolib. Cleanup Makefile.
+
+2002-07-14	Uwe Ohse <uwe@ranan.ohse.de>
+
+internal: add a number of copyright notices. LICENSES is gone now.
+version:  0.6.0
+ui:       add --transaction option to dcachemake.
+doc:      document that.
+
+2002-07-07	Uwe Ohse <uwe@fjoras.ohse.de>
+
+doc:      added dcachereplay man page.
+
+2002-07-06	Uwe Ohse <uwe@fjoras.ohse.de>
+
+ui:       added transaction handling to the library.
+check:    check this.
+ui:       added dcachereplay tool.
+
+2002-06-20	Uwe Ohse <uwe@fjoras.ohse.de>
+
+version:  0.5.1 beta
+package:  add package/libraries
+package:  add package/includes
+package:  deal with includes/libraries.
+internal: synced a number of files against the repository.
+
+2001-09-??	Uwe Ohse <uwe@fjoras.ohse.de>
+
+version:  0.5.0 - initial release

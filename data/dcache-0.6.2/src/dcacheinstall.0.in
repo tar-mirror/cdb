@@ -1,0 +1,107 @@
+.TH dcacheinstall 8 \*(VE \*(PA
+.hy 0
+.paragraph
+.section "How to install dcache"
+.paragraph
+This document describes how to download, compile, test and install dcache.
+.subsection "System requirements:"
+The dcache package is meant to run under UNIX and -lookalikes.
+.paragraph
+.subsection "Create a /package directory:"
+.nf
+.HTML <pre>
+  $ mkdir /package
+  $ chmod 1755 /package
+  $ cd /package
+.HTML </pre>
+.fi
+You may use another directory. No program in the dcache package cares
+where it is installed. /package is recommended.
+.paragraph
+.subscection "Download dcache:"
+The latest published dcache package is:
+.paragraph
+.extlink http://www.ohse.de/uwe/\*(PA/\*(PA-\*(VE.tar.gz \*(PA-\*(VE.tar.gz
+.paragraph
+You can alternatively download it through FTP:
+.paragraph
+.extlink ftp://www.ohse.de/uwe/\*(PA/\*(PA-\*(VE.tar.gz \*(PA-\*(VE.tar.gz
+.paragraph
+.subsection "Unpack the package:"
+.nf
+.HTML <pre>
+  $ gunzip \*(PA-\*(VE.tar.gz 
+  $ tar -xpf \*(PA-\*(VE.tar
+  $ rm \*(PA-\*(VE.tar
+  $ cd \*(CL/\*(PA-\*(VE
+.HTML </pre>
+.fi
+.subsection "Compile and install the programs:"
+.nf
+.HTML <pre>
+  $ package/install
+.HTML </pre>
+.fi
+.subsection "Where commands and documentation are installed:"
+By default the binaries are installed in \fB/package/\*(PA-\*(VE/commmand\fR.
+(replace /package/ by the directory where you you unpacked the dcache 
+distribution in). Symbolic links to the commands are created in 
+\fB/command/\fR and, for compatibility reasons, in \fB/usr/local/bin\fR.
+.br
+Manual pages are installed in \fB/package/\*(PA-\*(VE/doc\fR. Symbolic
+links to the manual pages are created under \fB/usr/local/man\fR.
+.paragraph
+If you don't like this then:
+.nf
+.HTML <pre>
+  $ package/compile && package/check
+  $ cp command/* /whereever/you/want/bin
+  $ cp doc/* /whereever/you/want/doc
+.HTML </pre>
+.fi
+.paragraph
+.subsection "Self check:"
+\fBcompile/install\fR (or \fBcompile/check\fR) try to run some automated 
+tests. If these
+tests fail the software will not be installed.
+.paragraph
+The tests take some time. Things are fine if they do not print anything.
+.subsection "How to report success: (not mandatory)"
+.nf
+.HTML <pre>
+  $ cat compile/auto-systype* | mail uwe-generic-counter@ohse.de
+.HTML </pre>
+.fi
+.paragraph
+Please do not send this email if the self-check failed. Send a
+problem report to the mailing list instead.
+.paragraph
+.subsection "Cleaning up:"
+If you are short on disk space you may remove the compile and src 
+directories:
+.nf
+.HTML <pre>
+  $ rm -rf compile src
+.HTML </pre>
+.fi
+.paragraph
+.subsection "Mailing list:"
+To subscribe to the dcache mailing list send a mail to
+\fBdcache-subscribe@lists.ohse.de\fR. The content is ignored.
+.paragraph
+You do not need to subscribe to the mailing list, it is an open one.
+But, if you are not subscribed, make sure to mention this in the mail.
+.paragraph
+Please include the dcache version number, the operating system and
+it's version and any possible relevant output of the failing program.
+Please include compile/systype in your posting.
+.paragraph
+If your system is a GNU/Linux one then please include name and
+version of your distribution and your C library version number (as
+printed by ldd --version).
+.paragraph
+.section "SEE ALSO"
+.nf
+The homepage may be more up-to-date, see
+.extlink http://www.ohse.de/uwe/dcache.html "the dcache home page" .
+.fi

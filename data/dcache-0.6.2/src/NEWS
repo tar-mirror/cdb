@@ -1,0 +1,24 @@
+0.6.2 July 2005
+
+* fix dietlibc related warnings (harmless, but let self check fail).
+* fix some other compiler warnings (harmless).
+* this release contains no functional changes.
+
+0.6.1 July 2005
+
+* added the dcachesh tool for interactive dcache manipulation.
+* dcacheadd has an option to delete all old records with the new key.
+* dcachedel and dcacheadd can use transactions.
+
+0.6.0 June 2002
+
+* added transaction handling to the library.
+* added dcachereplay tool.
+
+0.5.1 June 2002 (not released)
+
+* put library and include file into the appropriate directory.
+
+0.5.0 September 2001
+
+* initial release

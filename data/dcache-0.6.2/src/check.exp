@@ -1,0 +1,989 @@
+--- basic program invocation checks: dcachemake
+dcachemake: need more arguments. Use the --help option for more information.
+dcachemake DCACHE [TMPFILE] <INPUT
+1
+dcachemake: too many arguments. Use the --help option for more information.
+dcachemake DCACHE [TMPFILE] <INPUT
+1
+--- basic program invocation checks: dcachelist
+dcachelist: too many arguments. Use the --help option for more information.
+dcachelist [options] <DCACHE
+1
+--- basic program invocation checks: dcachestats
+dcachestats: too many arguments. Use the --help option for more information.
+dcachestats <DCACHE
+1
+--- basic program invocation checks: dcachedump
+dcachedump: too many arguments. Use the --help option for more information.
+dcachedump [options] <DCACHE
+1
+--- basic program invocation checks: dcachedel
+dcachedel: need more arguments. Use the --help option for more information.
+dcachedel [OPTIONS] CACHE KEY
+1
+dcachedel: too many arguments. Use the --help option for more information.
+dcachedel [OPTIONS] CACHE KEY
+1
+--- basic program invocation checks: dcacheget
+dcacheget: need more arguments. Use the --help option for more information.
+dcacheget KEY <CACHE
+::1
+dcacheget: too many arguments. Use the --help option for more information.
+dcacheget KEY <CACHE
+::1
+--- basic program invocation checks: dcachereplay
+dcachereplay: need more arguments. Use the --help option for more information.
+dcachereplay CACHE
+::1
+dcachereplay: too many arguments. Use the --help option for more information.
+dcachereplay CACHE
+::1
+--- dcachemake creates database
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    2
+slotuselimit:  12
+datalimit:     10000
+writepos:      50
+deletepos:     10000
+lastpos:       50
+datainuse:     50
+inserted:      2
+deleted:       0
+slot-moves:    0
+need-replay:   no
+--- dcachemake only creates valid length tables
+dcachemake: fatal: failed to create cache. dcache_create: invalid argument
+111
+dcachemake: fatal: failed to create cache. dcache_create: invalid argument
+111
+0
+dcachemake: fatal: failed to create cache. dcache_create: invalid argument
+111
+0
+dcachemake: fatal: failed to create cache. dcache_create: invalid argument
+111
+--- dcachestats basic operation OK
+dcachestats:
+version:       1
+slots:         18
+slotsinuse:    2
+slotuselimit:  12
+datalimit:     10000
+writepos:      50
+deletepos:     10000
+lastpos:       50
+datainuse:     50
+inserted:      2
+deleted:       0
+slot-moves:    0
+need-replay:   no
+--- dcacheget basic operation OK
+aaaaa::0
+--- dcachelist basic operation OK
+    0                           5 0001
+    1                           5 0002
+--- dcachelist -m basic operation OK
+#16
+S16
+I0001
+#17
+S16
+I0002
+--- dcachedump basic operation OK
++4,5:0001->aaaaa
++4,5:0002->bbbbb
+
+--- dcachedel basic operation OK
+0
++4,5:0002->bbbbb
+
+1
+--- dcachemake rejects 0 byte keys
+dcachemake: fatal: failed to enter record. dcache_enter: invalid argument
+111
+--- dcachedel rejects 0 byte keys
+0
++1,1:a->b
+
+1
++1,1:a->b
+
+0
+
+1
+
+--- dcachemake handles 0 byte length data
+0
+--- dcacheget handles 0 byte length data
+::0
+--- dcachedump handles 0 byte length data
++1,0:a->
+
+--- dcachelist -m handles 0 byte length data
+#7
+S7
+Ia
+P00004000
+He8b7be43
+L0
+--- dcachedel handles 0 byte length data
+0
+
+--- dcachemake handles duplicate keys
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    2
+slotuselimit:  12
+datalimit:     10000
+writepos:      50
+deletepos:     10000
+lastpos:       50
+datainuse:     50
+inserted:      2
+deleted:       0
+slot-moves:    0
+need-replay:   no
+--- dcachelist handles duplicate keys
+    0                           5 0001
+    1                           5 0001
+--- dcachelist -m handles duplicate keys
+#4
+S4
+I0001
+#5
+S4
+I0001
+--- dcachedump handles duplicate keys
++4,5:0001->aaaaa
++4,5:0001->bbbbb
+
+--- dcachedel handles duplicate keys
+0
++4,5:0001->bbbbb
+
+--- dcacheget finds multiple records with the same key
+aaaa1::0
+aaaa1::0
+aaaa2::0
+--- dcacheget --all finds all records with the same key
+aaac1aaac2::0
+--- dcacheget doesn't find n+1th records with the same key
+::1
+--- dcacheget --separator works
+aaaa1SEPaaaa2SEP::0
+--- dcacheget --separator --escape works
+aaaaaaaaa11aaaaaaaa21::0
+aaaa111aaaa21::0
+--- dcachemake -a catches bad cache
+dcachemake: fatal: failed to initialize cache. dcache_init: invalid argument
+111
+--- dcachestats catches bad cache
+dcachestats: fatal: failed to initialize cache: invalid argument
+111
+--- dcachedump catches bad cache
+dcachedump: fatal: failed to initialize cache: invalid argument
+111
+--- dcachelist catches bad cache
+dcachelist: fatal: failed to initialize cache: invalid argument
+111
+--- dcacheget catches bad cache
+dcacheget: fatal: failed to initialize cache: invalid argument
+100
+--- dcachedel catches bad cache
+dcachedel: fatal: failed to initialize cache: invalid argument
+111
+--- dcachemake -a handles shortened cache files
+dcachemake: fatal: failed to initialize cache. dcache_init: invalid argument
+--- dcachestats handles shortened cache files
+dcachestats: fatal: failed to initialize cache: invalid argument
+--- dcachelist handles shortened cache files
+dcachelist: fatal: failed to initialize cache: invalid argument
+--- dcachedump handles shortened cache files
+dcachedump: fatal: failed to initialize cache: invalid argument
+--- dcachedel handles shortened cache files
+dcachedel: fatal: failed to initialize cache: invalid argument
+--- dcachemake ignores superfluous input lines
+0
+slotsinuse:    1
+--- dcachemake handles unexpected end-of-file
+0
+dcachemake: fatal: unexpected end of file in input line 2
+100
+dcachemake: fatal: unexpected end of file in input line 3
+100
+--- dcachemake finds bad input
+dcachemake: fatal: unexpected character 0x62 in input line 1
+100
+dcachemake: fatal: unexpected end of file in input line 2
+100
+0
+dcachemake: fatal: failed to enter record. dcache_enter: input/output error
+111
+dcachemake: fatal: failed to enter record. dcache_enter: input/output error
+111
+dcachemake: fatal: bad length in input line 1
+100
+dcachemake: fatal: bad length in input line 1
+100
+dcachemake: fatal: unexpected character 0x3a in input line 1
+100
+dcachemake: fatal: unexpected character 0x3c in input line 1
+100
+dcachemake: fatal: unexpected character 0x2c in input line 1
+100
+dcachemake: fatal: unexpected character 0x61 in input line 1
+100
+--- dcachemake handles correct tai values
+0
+0
+0
+--- dcachedump handles tai values
++1,1@ffeeddccbbaabdef:a->b
+
+--- dcachelist handles tai values
+#7
+S7
+Ia
+P00004000
+He8b7be43
+@ffeeddccbbaabdef
+L1
+--- dcachemake handles bad tai values
+dcachemake: fatal: bad expire date in input line 1
+100
+dcachemake: fatal: bad expire date in input line 1
+100
+dcachemake: fatal: unexpected character 0x67 in input line 1
+100
+dcachemake: fatal: unexpected character 0x30 in input line 1
+100
+--- dcachemake handles long keys
+0
+dcachestats:
+version:       1
+slots:         128
+slotsinuse:    3
+slotuselimit:  96
+datalimit:     10000
+writepos:      4146
+deletepos:     6198
+lastpos:       8268
+datainuse:     7948
+inserted:      13
+deleted:       10
+slot-moves:    0
+need-replay:   no
+--- dcachemake -a handles long keys and their deletion
+0
+0
+dcachestats:
+version:       1
+slots:         128
+slotsinuse:    1
+slotuselimit:  96
+datalimit:     2500
+writepos:      2074
+deletepos:     2500
+lastpos:       2074
+datainuse:     2074
+inserted:      26
+deleted:       25
+slot-moves:    0
+need-replay:   no
+--- dcachelist handles long keys
+    0####    1029____#####    k
+--- dcachelist -m handles long keys
+#109
+S109
+I____#####   k
+P00004000
+H84d85a6d
+L1029
+--- dcachedump handles long keys
++1029,1029:____#####   k->____###    0123456789
+
+--- dcachedel handles long keys
+0
+
+--- dcache_walk handles empty cache
+
+--- dcacheadd works
+0
++1,5:1->val1
+
+
+--- dcacheadd works with input from pipe
+0
++1,5:2->val2
+
+
+---
+--- check for specific problems
+---
+--- dcachemake creates database with filled hash table
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    12
+slotuselimit:  12
+datalimit:     10000
+writepos:      300
+deletepos:     10000
+lastpos:       300
+datainuse:     300
+inserted:      12
+deleted:       0
+slot-moves:    0
+need-replay:   no
+#0
+S0
+I0008
+#1
+S1
+I0007
+#2
+S2
+I0000
+#3
+S3
+I0010
+#4
+S4
+I0001
+#5
+S5
+I0011
+#6
+S6
+I0009
+#7
+S7
+I0006
+#8
+S8
+I0003
+#11
+S11
+I0004
+#13
+S13
+I0005
+#14
+S14
+I0002
+--- dcachemake -a adds one record
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    12
+slotuselimit:  12
+datalimit:     10000
+writepos:      325
+deletepos:     25
+lastpos:       325
+datainuse:     300
+inserted:      13
+deleted:       1
+slot-moves:    0
+need-replay:   no
+#0
+S0
+I0008
+#1
+S1
+I0007
+#3
+S3
+I0010
+#4
+S4
+I0001
+#5
+S5
+I0011
+#6
+S6
+I0009
+#7
+S7
+I0006
+#8
+S8
+I0003
+#11
+S11
+I0004
+#13
+S13
+I0005
+#14
+S14
+I0002
+#15
+S15
+I0012
+--- dcachemake -a adds four records
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    12
+slotuselimit:  12
+datalimit:     10000
+writepos:      425
+deletepos:     125
+lastpos:       425
+datainuse:     300
+inserted:      17
+deleted:       5
+slot-moves:    0
+need-replay:   no
+#0
+S0
+I0008
+#1
+S1
+I0007
+#3
+S3
+I0010
+#5
+S5
+I0011
+#6
+S6
+I0009
+#7
+S7
+I0006
+#8
+S6
+I0016
+#9
+S9
+I0013
+#10
+S10
+I0014
+#12
+S12
+I0015
+#13
+S13
+I0005
+#15
+S15
+I0012
+--- dcachemake -d works
++4:0001
++4:0001
++4:0011
++4:0009
++4:0009
++4:0029
++4:0002
+--- dcache_enter allows maximum length key/record/overhead combination
+dcachemake: fatal: failed to enter record. dcache_enter: out of memory
+111
+--- dcache_enter disallows overlong key/record/overhead combination
+dcachemake: fatal: failed to enter record. dcache_enter: invalid argument
+111
+--- dcache_enter handles perfectly filled dataarea
+#0
+S0
+I0017
+P000040af
+#1
+S1
+I0018
+P000040c8
+#3
+S3
+I0010
+P00004000
+#5
+S5
+I0011
+P00004019
+#6
+S6
+I0016
+P00004096
+#7
+S7
+I0019
+P000040e1
+#9
+S9
+I0013
+P0000404b
+#10
+S10
+I0014
+P00004064
+#12
+S12
+I0015
+P0000407d
+#15
+S15
+I0012
+P00004032
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    10
+slotuselimit:  12
+datalimit:     250
+writepos:      250
+deletepos:     250
+lastpos:       250
+datainuse:     250
+inserted:      20
+deleted:       10
+slot-moves:    2
+need-replay:   no
++4,5:0010->aaaaa
++4,5:0011->aaaaa
++4,5:0012->aaaaa
++4,5:0013->aaaaa
++4,5:0014->aaaaa
++4,5:0015->aaaaa
++4,5:0016->aaaaa
++4,5:0017->aaaaa
++4,5:0018->aaaaa
++4,5:0019->aaaaa
+
+--- dcache_enter handles rollover with free space left
+#3
+S3
+I0010
+P00004054
+#5
+S5
+I0011
+P00004072
+#6
+S6
+I0009
+P00004037
+#9
+S9
+I0013
+P000040b1
+#10
+S10
+I0014
+P000040d2
+#12
+S12
+I0015
+P00004000
+#15
+S15
+I0012
+P00004091
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    7
+slotuselimit:  12
+datalimit:     250
+writepos:      35
+deletepos:     55
+lastpos:       244
+datainuse:     230
+inserted:      100
+deleted:       93
+slot-moves:    5
+need-replay:   no
++4,9:0009->xxxxxxxxx
++4,10:0010->xxxxxxxxxx
++4,11:0011->xxxxxxxxxxx
++4,12:0012->xxxxxxxxxxxx
++4,13:0013->xxxxxxxxxxxxx
++4,14:0014->xxxxxxxxxxxxxx
++4,15:0015->xxxxxxxxxxxxxxx
+
+--- dcache_enter handles rollover with free space left (2)
+#3483
+S3483
+I0258
+P00010000
+dcachestats:
+version:       1
+slots:         5000
+slotsinuse:    1
+slotuselimit:  3750
+datalimit:     5000
+writepos:      2600
+deletepos:     5000
+lastpos:       2600
+datainuse:     2600
+inserted:      1000
+deleted:       999
+slot-moves:    3
+need-replay:   no
+--- dcache_enter handles input from fd
+0
+dcachestats:
+version:       1
+slots:         24
+slotsinuse:    10
+slotuselimit:  18
+datalimit:     1000000
+writepos:      327880
+deletepos:     1000000
+lastpos:       327880
+datainuse:     327880
+inserted:      10
+deleted:       0
+slot-moves:    0
+need-replay:   no
+--- dcacheget handles 0 byte length data
+::0
+--- dcachedel handle HBF
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    3
+slotuselimit:  12
+datalimit:     10000
+writepos:      100
+deletepos:     10000
+lastpos:       100
+datainuse:     100
+inserted:      4
+deleted:       1
+slot-moves:    1
+need-replay:   no
+#13
+S13
+I0005
+#14
+S14
+I0002
+#15
+S13
+I0032
+--- dcachedel handles multiple deletes
+-- start state
+P00004000
+P00004019
+P00004032
+P0000404b
+P00004064
+P0000407d
+P00004096
+P000040af
+P000040c8
+P000040e1
+P000040fa
+P00004113
+-- delete first
+P00004019
+P00004032
+P0000404b
+P00004064
+P0000407d
+P00004096
+P000040af
+P000040c8
+P000040e1
+P000040fa
+P00004113
+-- delete third
+P00004019
+P00004032
+P00004064
+P0000407d
+P00004096
+P000040af
+P000040c8
+P000040e1
+P000040fa
+P00004113
+-- delete all
+dcachestats:
+version:       1
+slots:         16
+slotsinuse:    0
+slotuselimit:  12
+datalimit:     10000
+writepos:      300
+deletepos:     10000
+lastpos:       300
+datainuse:     300
+inserted:      12
+deleted:       12
+slot-moves:    64
+need-replay:   no
+--- dcachedel handle HBF chain
+#0
+S0
+I0008
+#1
+S0
+I0017
+#2
+S0
+I0020
+#3
+S3
+I0010
+#15
+S15
+I0025
+--- dcachedel handle HFB
+#0
+S15
+I0025
+#15
+S15
+I0012
+--- dcachedel handle FBH
+#1
+S1
+I0007
+#2
+S1
+I0018
+#14
+S14
+I0002
+#15
+S14
+I0035
+--- dcachedel handle BFH
+#4
+S4
+I0001
+#5
+S5
+I0011
+#6
+S4
+I0029
+--- dcachedel handle BHF
+#0
+S0
+I0008
+#1
+S0
+I0017
+#2
+S0
+I0020
+#4
+S4
+I0001
+#5
+S4
+I0029
+--- dcache_delete write instead of read bug
++4,5:0000->00000
++4,5:0002->00002
++4,5:0003->00003
+
+--- dcacheget handles long keys
+0
+dcachestats:
+version:       1
+slots:         128
+slotsinuse:    13
+slotuselimit:  96
+datalimit:     1000000
+writepos:      21746
+deletepos:     1000000
+lastpos:       21746
+datainuse:     21746
+inserted:      13
+deleted:       0
+slot-moves:    0
+need-replay:   no
+0123456789
+--- dcachestat catches bad cache
+dcachestats: fatal: failed to initialize cache: invalid argument
+111
+--- dcache_writev works
+- a few strings from memory
+012
+- more strings than the internal iovec array can hold
+0123456789abcdefghijkl
+- input from fd
+0123456789abcdef
+- mixed input from memory and fd
+0123456789abcdef012---345
+0
+--- transaction #1: basic transaction with 2 new entries
+---- try to find these entries before the commit (XFAIL)
+no record with key key1 found
+no record with key key2 found
+---- try to find them after the commit, before the replay (XFAIL)
+no record with key key1 found
+no record with key key2 found
+---- try to find them after the replay
+Nr.    DataLen   DataPosition for key key1
+   0         6 0x0000000000004014
+Nr.    DataLen   DataPosition for key key2
+   0         4 0x000000000000402e
+---- dumping cache
++4,6:key1->value1
++4,4:key2->val2
+
+--- transaction #2: basic transaction with a delete
+---- try to find entries before deletion
+Nr.    DataLen   DataPosition for key key1
+   0         6 0x0000000000004014
+Nr.    DataLen   DataPosition for key key2
+   0         4 0x000000000000402e
+---- try to find entries before committing deletion
+Nr.    DataLen   DataPosition for key key1
+   0         6 0x0000000000004014
+Nr.    DataLen   DataPosition for key key2
+   0         4 0x000000000000402e
+---- try to find them after the commit, before the replay
+Nr.    DataLen   DataPosition for key key1
+   0         6 0x0000000000004014
+Nr.    DataLen   DataPosition for key key2
+   0         4 0x000000000000402e
+---- try to find them after the replay
+no record with key key1 found
+Nr.    DataLen   DataPosition for key key2
+   0         4 0x000000000000402e
+--- transaction #3: mixed enter/delete
+Nr.    DataLen   DataPosition for key key1
+   0        10 0x0000000000004046
+no record with key key2 found
+--- transaction #4: cancels work?
+Nr.    DataLen   DataPosition for key key1
+   0        10 0x0000000000004046
+no record with key key3 found
+--- transaction #5: no further transaction possible before replay
+dcachesh: failed to start transaction: device busy
+--- transaction #6: replays work after a re-open of the cache
+Nr.    DataLen   DataPosition for key key1
+   0         6 0x0000000000004014
+   1         7 0x0000000000004062
+no record with key key2 found
+Nr.    DataLen   DataPosition for key key3
+   0         6 0x0000000000004048
+Nr.    DataLen   DataPosition for key key4
+   0         4 0x000000000000407d
+--- transaction #7: misc. misuses
+---- no replay needed
+dcachesh: no transaction needs replay
+---- no cancel possible
+dcachesh: failed to cancel transaction: invalid argument
+---- no commit possible
+dcachesh: failed to commit transaction: invalid argument
+---- empty commit
+---- commit follows cancel
+dcachesh: failed to commit transaction: invalid argument
+---- start after commit without replay
+dcachesh: failed to start transaction: device busy
+---- readonly cache
+dcachesh: failed to commit transaction: file descriptor not open
+--- transaction #8: rollover handling
+---- filling the cache
+---- adding a record
+---- commit and replay
+dcache will delete key01 at 0x0000000000004015
+no record with key key01 found
+Nr.    DataLen   DataPosition for key key11
+   0        11 0x0000000000004015
+---- adding 9 records
+---- commit
+---- key11 still should be alive
+Nr.    DataLen   DataPosition for key key11
+   0        11 0x0000000000004015
+---- key02 still should be alive
+Nr.    DataLen   DataPosition for key key02
+   0        11 0x0000000000004035
+---- replay
+dcache will delete key02 at 0x0000000000004035
+dcache will delete key03 at 0x0000000000004055
+dcache will delete key04 at 0x0000000000004075
+dcache will delete key05 at 0x0000000000004095
+dcache will delete key06 at 0x00000000000040b5
+dcache will delete key07 at 0x00000000000040d5
+dcache will delete key08 at 0x00000000000040f5
+dcache will delete key11 at 0x0000000000004015
+dcache will delete key21 at 0x0000000000004035
+---- dump the cache
+no record with key key21 found
+Nr.    DataLen   DataPosition for key key22
+   0        11 0x0000000000004055
+Nr.    DataLen   DataPosition for key key23
+   0        11 0x0000000000004075
+Nr.    DataLen   DataPosition for key key24
+   0        11 0x0000000000004095
+Nr.    DataLen   DataPosition for key key25
+   0        11 0x00000000000040b5
+Nr.    DataLen   DataPosition for key key26
+   0        11 0x00000000000040d5
+Nr.    DataLen   DataPosition for key key27
+   0        11 0x00000000000040f5
+Nr.    DataLen   DataPosition for key key28
+   0        11 0x0000000000004015
+Nr.    DataLen   DataPosition for key key29
+   0        11 0x0000000000004035
+dcache will delete key22 at 0x0000000000004055
+dcache will delete key23 at 0x0000000000004075
+dcache will delete key24 at 0x0000000000004095
+dcache will delete key25 at 0x00000000000040b5
++5,11:key26->round2data6
++5,11:key27->round2data7
++5,11:key28->round2data8
++5,11:key29->round2data9
++5,11:key30->round3data0
++5,11:key31->round3data1
++5,11:key40->round4data0
++5,11:key41->round4data1
+
+--- transaction #9: dcachereplay works
+value02
+--- transaction #10: dcachemake --transaction works
++4,5:0001->aaab3
++4,5:0029->aaab3
++4,5:0012->aaab3
++4,5:0108->Aaab3
++4,5:0117->Aaab3
++4,5:0120->Aaab3
++4,5:0101->Aaab3
++4,5:0129->Aaab3
++4,5:0112->Aaab3
+
+dcachestats:
+version:       1
+slots:         12
+slotsinuse:    9
+slotuselimit:  9
+datalimit:     10000
+writepos:      300
+deletepos:     75
+lastpos:       300
+datainuse:     225
+inserted:      12
+deleted:       3
+slot-moves:    3
+need-replay:   no
+--- dcacheadd --delete works
+    0                           5 key1
+val1
+    0                           5 key1
+val2
+    0                           5 key1
+    1                           6 key1
+val2
+val2a
+    0                           5 key1
+val3
+--- dcacheadd --transaction works
+    0                           5 key1
+val2
+--- dcachedel --transaction is recognized
+    0                           5 key1
+- now add another and delete all

@@ -1,0 +1,12 @@
+The dcache package contains a disk based caching library and a number of
+tools.
+See
+   http://www.ohse.de/uwe/dcache.html
+for more information.
+
+ftpcopy comes with NO warranty.
+
+Read INSTALL or http://www.ohse.de/uwe/ftpcopy/install.html for 
+instructions how to install ftpcopy.
+
+Uwe Ohse, 2001-9-02

@@ -1,0 +1,376 @@
+#! /usr/bin/perl -w
+
+sub die_arg() {
+  print STDERR "usage: uogo2man PACKAGE PROGRAM SECTION FORMAT [opt SEC]...\n";
+  exit(2);
+
+}
+my $package=$ARGV[0] || die_arg;
+my $prog=$ARGV[1] || die_arg;
+my $secnum=$ARGV[2] || die_arg;
+my $format=$ARGV[3] || die_arg;
+
+my $html=1 if ($format eq "html");
+   $html=0 if ($format eq "man");
+die "format must be html or man" unless (defined($html));
+
+my $i;
+for ($i=0;$i<4;$i++) {
+  shift(@ARGV);
+}
+my $keywords="";
+my @extra_options;
+my @extra_tags;
+while ($ARGV[0]) {
+  die "bad number of arguments" unless ($ARGV[1]);
+  if ($ARGV[0] eq "keywords") {
+    $keywords=$ARGV[1];
+  } else {
+    push(@extra_options,$ARGV[0]);
+    push(@extra_tags,$ARGV[1]);
+  }
+  shift(@ARGV);
+  shift(@ARGV);
+}
+
+my $cprog=$prog;
+$cprog =~ s%^.*/%%;
+open(I,"$prog --manhelp-short-desc|") || die_no_help;
+my $description;
+while (<I>) {
+  chomp();
+  $description=$_;
+  last;
+}
+close(I);
+die "no description" unless ($description);
+
+my $datum=`date +%Y-%m-%d`;
+chomp($datum);
+
+sub die_no_help() {
+  die "failed to get help from $prog: $!";
+}
+sub xx_substitutions($) {
+  my $x=shift;
+  $x=~s/xxPACKAGExx/$package/g;
+  $x=~s/xxPROGRAMxx/$cprog/g;
+  $x=~s/xxDESCRIPTIONxx/$description/g;
+  $x=~s/xxKEYWORDSxx/$keywords/g;
+  return $x;
+}
+sub output_file($) {
+  my $f=shift;
+  if (open(I,"<$f")) {
+    while(<I>) {
+      $_=xx_substitutions($_);
+      print $_;
+    }
+    close(I);
+  }
+}
+
+my $secname;
+if (!$html) {
+  if    ($secnum == 1) { $secname="User Commands"; }
+  elsif ($secnum == 2) { $secname="System Calls"; }
+  elsif ($secnum == 3) { $secname="Library Functions"; }
+  elsif ($secnum == 4) { $secname="Special Files"; }
+  elsif ($secnum == 5) { $secname="File Formats"; }
+  elsif ($secnum == 6) { $secname="Games"; }
+  elsif ($secnum == 7) { $secname="Miscellaneous"; }
+  elsif ($secnum == 8) { $secname="Administration Commands"; }
+  elsif ($secnum == 9) { $secname="Kernel Internals"; }
+  else                 { $secname="???"; }
+}
+
+if (open(I,"<doc-innerlinks")) {
+  while (<I>) {
+    chop;
+    next if (/^#/);
+    next if (/^$/);
+    if (/^(\S*)\s+(.*)/) {
+      my $k=$1;
+      my $v=$2;
+      $k=~ s/\(/\\(/g;
+      $k=~ s/\)/\\)/g;
+      $innerlinks{$k}=$v;
+    }
+  }
+  close(I);
+}
+if (open(I,"<doc-highlights")) {
+  while (<I>) {
+    chop;
+    next if (/^#/);
+    next if (/^$/);
+    if (/^(\S*)\s+(.*)/) {
+      $hl{$1}=$2;
+    } elsif (/^(\S*)/) {
+      $hl{$1}="";
+    }
+  }
+  close(I);
+}
+sub do_hl($)
+{
+  my $x=shift;
+  my $k;
+  if ($html) {
+    foreach $k (keys %innerlinks) {
+      my $v=$innerlinks{$k};
+      $x =~ s%($k)%<a href="$v">$1</a>%g;
+#print STDERR "I $k\n";
+#      $x =~ s%$k%XXXXXX%g;
+#      $t="dcache_intro\\(7\\)";
+#      $x =~ s%$t%XXXXXX%g;
+    }
+  }
+  foreach $k (keys %hl) {
+    if ($html) {
+      if ($x !~ m%http://% && $x !~ m%$k(-\S+)*\@(\S+)%) {
+	$x =~ s%([^"]|^)\b$k\b%$1<b>$k</b>%g;
+      }
+    } else {
+      $x =~ s/(\b$k\b)/\\fB$k\\fR/g;
+    }
+  }
+  if ($html) {
+    $x =~ s%<(\S+\@\S+)>%<a href="mailto:$1">$1</a>%g;
+    $x =~ s%(http://\S+)%<a href="$1">$1</a>%g;
+  }
+  return $x;
+}
+sub copy_option_output($$$)
+{
+  my $opt=shift;
+  my $x=shift;
+  my $dohl=shift;
+  open(I,"$prog $opt|") || die_no_help;
+  my $flag=0;
+  my $inex=0;
+  my $flag_dl=0;
+  my $in_p=0;
+  my $kill_usage=0;
+  $kill_usage=1 if ($x eq "SYNOPSIS");
+
+  while (<I>) {
+    $_=~ s%\\%\\\\%g;
+    if ($html) {
+      s/&/&amp;/g;
+      s/</&lt;/g;
+      s/>/&gt;/g;
+    }
+    if ($kill_usage && /^usage:\s*(.*)/i) {
+      $_=$1."\n";
+    }
+    if (!$flag) {
+      if ($html) {
+	$n=$x;
+	$n=~ s/\s/-/g;
+	print "<h3><a name=\"$n\"></a>$x</h3>\n";
+      } else {
+	print ".SH \"$x\"\n" unless ($flag);
+      }
+    }
+    $flag=1;
+    if ($inex && !/^ /) {
+      $inex=0;
+      if ($html) {
+	print "</pre>\n";
+      } else {
+	print ".fi\n";
+      }
+    }
+    if (/\S/ && !$in_p && !$inex) {
+      print "<p>\n";
+      $in_p=1;
+    }
+    if (/^ *\n$/) {
+      if ($html) {
+	if ($in_p) { $in_p=0; print "</p>\n";}
+      } else {
+	print ".P\n";
+      }
+      next;
+    }
+    if (/^ / && !$inex) {
+      $inex=1;
+      if ($html) {
+	if ($in_p) { $in_p=0; print "</p>\n";}
+	print "<pre>\n";
+      } else {
+	print ".nf\n";
+      }
+    }
+    $_=do_hl($_) if ($dohl);
+    print "\\" if (/^'/ && !$html);
+    print $_;
+  }
+  if ($inex) {
+    if ($html) {
+      print "</pre>\n";
+    } else {
+      print ".fi\n";
+    }
+  }
+  if ($flag_dl) {
+    print "</dl>\n";
+  }
+  if ($in_p) { $in_p=0; print "</p>\n";}
+  close(I);
+}
+sub copy_manhelp_options_output($$$)
+{
+  my $opt=shift;
+  my $x=shift;
+  my $dohl=shift;
+  open(I,"$prog $opt|") || die_no_help;
+  my $flag=0;
+  my $flag_dl=0;
+  my $in_indent=0;
+  my $in_dd=0;
+  my $in_dt=0;
+  my $in_p=0;
+  my $markword="";
+
+  while (<I>) {
+    $_=~ s%\\%\\\\%g;
+    if ($html) {
+      s/&/&amp;/g;
+      s/</&lt;/g;
+      s/>/&gt;/g;
+    }
+    if (!$flag) {
+      if ($html) {
+	$n=$x;
+	$n=~ s/\s/-/g;
+	print "<h3><a name=\"$n\"></a>$x</h3>\n";
+      } else {
+	print ".SH \"$x\"\n" unless ($flag);
+      }
+      $flag=1;
+    }
+    if ($in_indent && !/^    /) {
+      $in_indent=0;
+      if ($html) {
+	print "</pre>\n";
+      } else {
+	print ".fi\n";
+      }
+    }
+    if (/^    / && !$in_indent) {	
+      $in_indent=1;
+      if ($html) {
+	if ($in_p) { $in_p=0; print "</p>\n";}
+	print "<pre>\n";
+      } else {
+	print ".nf\n";
+      }
+    }
+    if (/^-/) {
+      $markword="";
+      $markword=$1 if (/=(.*)\n/);
+      if (!$flag_dl && $html) {
+	print "<dl>\n";
+	$flag_dl=1;
+      }
+      if ($html)  {
+	if ($in_dd) { $in_dd=0; print "</dd>\n";}
+	if ($in_dt) { $in_dt=0; print "</dt>\n";}
+	print "<dt>\n";
+	$in_dt=1;
+      } else {
+	print ".TP\n";
+      }
+      print $_;
+      if ($html)  {
+	if ($in_dd) { $in_dd=0; print "</dd>\n";}
+	if ($in_dt) { $in_dt=0; print "</dt>\n";}
+	print "<dd>\n";
+	$in_dd=1;
+#      } else {
+#	print ".br\n";
+      }
+      next;
+    }
+    if (/\S/ && !$in_p && !$in_dt && !$in_dd) {
+      print "<p>\n";
+      $in_p=1;
+    }
+    if (/^$/) {
+      if ($html) {
+	if ($in_p) { $in_p=0; print "</p>\n";}
+      } else {
+	print ".br\n";
+      }
+      next;
+    }
+    $_=do_hl($_) if ($dohl);
+    if ($markword) {	
+      if ($html) {
+	s%(\b$markword\b)%<i>$markword</i>%g;
+      } else {
+	s/(\b$markword\b)/\\fI$markword\\fR/g;
+      }
+    }
+    if (!/^ /) {
+      if ($html) {
+	print "<h3>$_</h3>\n";
+      } else {
+	print ".SS $_\n";
+      }
+      next
+    }
+    s/^  //;
+    print "\\" if (/^'/ && !$html);
+    print $_;
+    if (!$html) {
+      print ".br\n";
+    }
+  }
+  if ($in_dd) { $in_dd=0; print "</dd>\n";}
+  if ($in_dt) { $in_dt=0; print "</dt>\n";}
+  if ($flag_dl) {
+    print "</dl>\n";
+  }
+  if ($in_indent) {
+    if ($html) {
+      print "</pre>\n";
+    } else {
+      print ".fi\n";
+    }
+  }
+  if ($in_p) { $in_p=0; print "</p>\n";}
+  close(I);
+}
+
+if ($html) {
+  output_file("doc-html-header");
+} else {
+  print ".TH $cprog $secnum $datum \"\" \"$secname\"\n";
+}
+
+
+
+if ($html) {
+  print "<p>";
+  print "$cprog - $description\n";
+  print "</p>";
+} else {
+  print ".SH NAME\n";
+  print "$cprog \\- $description\n";
+}
+
+copy_option_output("--manhelp-synopsis","SYNOPSIS",0);
+copy_option_output("--manhelp-long-desc","DESCRIPTION",1);
+copy_manhelp_options_output("--manhelp-options","OPTIONS",1);
+copy_option_output("--examples","EXAMPLES",1);
+for ($i=0;$extra_options[$i];$i++) {
+  copy_option_output($extra_options[$i],$extra_tags[$i],1);
+}
+copy_option_output("--copyright","COPYRIGHT",1);
+copy_option_output("--author","AUTHOR",1);
+copy_option_output("--manhelp-tail","MORE INFORMATION",1);
+copy_option_output("--see-also","SEE ALSO",1);
+output_file("doc-html-tail");
